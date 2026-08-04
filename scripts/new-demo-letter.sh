@@ -4,8 +4,8 @@
 # 手紙は最初に開いた端末に紐づいて他からは読めなくなるため、
 # デモを繰り返すなら毎回新しい符号で用意する必要がある。
 #
-#   ./scripts/new-demo-letter.sh              符号は自動生成 (6文字)
-#   ./scripts/new-demo-letter.sh SAKURA       符号を指定 (5〜8文字, I O 0 1 は不可)
+#   ./scripts/new-demo-letter.sh              符号は自動生成 (読める10文字)
+#   ./scripts/new-demo-letter.sh SAKURA       符号を指定 (5〜12文字の英字)
 #   BASE_URL=http://localhost:3100 ./scripts/new-demo-letter.sh
 #
 # 本文は scripts/demo-letter.txt を編集する。

@@ -11,17 +11,18 @@ import {
 
 export class CreateLetterDto {
   /**
-   * 符号を指定する。デモで口頭で伝えるときに覚えやすい文字列を使うため。
-   * 省略すればランダムに6文字で発行される。
+   * 符号を指定する。デモで意味のある言葉を使いたいときのため
+   * (SAKURA など)。省略すれば読める符号が自動発行される。
    *
-   * 見間違えやすい I O 0 1 は使えない(符号は声で伝える前提なので)。
-   * 5文字未満を許すと総当たりが現実的になるため下限を設けている
-   * (4文字は約100万通りで、レート制限内でも数日で舐められる)
+   * 数字を許さない。声に出して渡す前提なので、I と 1、O と 0 の
+   * 見間違いを構造的に排除している。
+   *
+   * 5文字未満を許すと総当たりが現実的になるため下限を設けている。
    */
   @IsOptional()
   @IsString()
-  @Matches(/^[A-HJ-NP-Za-hj-np-z2-9]{5,8}$/, {
-    message: 'code must be 5-8 characters and must not contain I, O, 0 or 1',
+  @Matches(/^[A-Za-z]{5,12}$/, {
+    message: 'code must be 5-12 letters (no digits)',
   })
   code?: string;
 

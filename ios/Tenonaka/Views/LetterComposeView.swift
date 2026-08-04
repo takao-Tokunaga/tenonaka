@@ -161,11 +161,18 @@ struct SentCodeView: View {
                     .foregroundStyle(Paper.inkSoft)
 
                 Text(letter.code)
-                    .font(.system(size: 52, weight: .semibold, design: .serif))
-                    .kerning(8)
+                    .font(.system(
+                        size: letter.code.count > 8 ? 34 : 50,
+                        weight: .semibold,
+                        design: .serif
+                    ))
+                    .kerning(letter.code.count > 8 ? 3 : 8)
                     .foregroundStyle(Paper.ink)
+                    .minimumScaleFactor(0.6)
+                    .lineLimit(1)
+                    .padding(.horizontal, 24)
 
-                Text("この符号を相手に伝えてください")
+                Text("この符号を相手に声で伝えてください")
                     .font(Mincho.font(12.5))
                     .foregroundStyle(Paper.inkFaint)
 

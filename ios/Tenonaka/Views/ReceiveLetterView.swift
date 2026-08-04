@@ -27,17 +27,25 @@ struct ReceiveLetterView: View {
                         .foregroundStyle(Paper.inkSoft)
 
                     TextField("", text: $code)
-                        .font(.system(size: 40, weight: .semibold, design: .serif))
-                        .kerning(10)
+                        // 10文字の符号が入るので、長さに応じて字を詰める
+                        .font(.system(
+                            size: code.count > 8 ? 27 : 38,
+                            weight: .semibold,
+                            design: .serif
+                        ))
+                        .kerning(code.count > 8 ? 3 : 8)
                         .multilineTextAlignment(.center)
+                        .animation(.easeOut(duration: 0.15), value: code.count > 8)
                         .foregroundStyle(Paper.ink)
                         .tint(Paper.ribbon)
                         .textInputAutocapitalization(.characters)
                         .autocorrectionDisabled()
                         .focused($isFocused)
                         .onChange(of: code) { _, value in
-                            // 符号は大文字5文字まで
-                            code = String(value.uppercased().prefix(5))
+                            // 符号は英字のみ。自動発行は10文字で、指定符号は最大12文字
+                            code = String(
+                                value.uppercased().filter { $0.isLetter }.prefix(12)
+                            )
                         }
                         .padding(.bottom, 10)
                         .overlay(alignment: .bottom) {
@@ -63,14 +71,14 @@ struct ReceiveLetterView: View {
                             .padding(.vertical, 13)
                             .background {
                                 Capsule().fill(
-                                    code.count >= 3
+                                    code.count >= 5
                                         ? Paper.ink.opacity(0.88)
                                         : Paper.inkFaint.opacity(0.4)
                                 )
                             }
                     }
                     .buttonStyle(.plain)
-                    .disabled(code.count < 3 || isFetching)
+                    .disabled(code.count < 5 || isFetching)
                 }
 
                 Spacer()

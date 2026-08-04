@@ -5,19 +5,48 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { Letter } from '@prisma/client';
+import { randomInt } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateLetterDto } from './dto/create-letter.dto';
 import { ReadReceiptDto } from './dto/read-receipt.dto';
 
-/// 口で伝える符号なので、見間違えやすい文字(I O 0 1)を外している
-const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-/// 6文字で約10億通り。声で伝えられる長さを保ちつつ総当たりを困難にする
-const CODE_LENGTH = 6;
+/**
+ * 符号は声に出して人に渡すものなので、読める言葉にする。
+ *
+ * 仮名の音節を並べるので日本語話者はそのまま読める(HANAREKUMI のように)。
+ * ランダムな英数字だと「にーゆーじぇいいーしーじー」となり、手渡しの言葉にならない。
+ *
+ * 数字を使わないので、I と 1、O と 0 の見間違いも起きない。
+ * そのため以前のように I O を除外する必要がなく、母音が全部使える。
+ */
+const SYLLABLES = [
+  'KA', 'KI', 'KU', 'KE', 'KO',
+  'SA', 'SU', 'SE', 'SO',
+  'TA', 'TE', 'TO',
+  'NA', 'NI', 'NU', 'NE', 'NO',
+  'HA', 'HI', 'HU', 'HE', 'HO',
+  'MA', 'MI', 'MU', 'ME', 'MO',
+  'YA', 'YU', 'YO',
+  'RA', 'RI', 'RU', 'RE', 'RO',
+  'WA',
+  'GA', 'GI', 'GU', 'GE', 'GO',
+  'ZA', 'ZU', 'ZE', 'ZO',
+  'DA', 'DE', 'DO',
+  'BA', 'BI', 'BU', 'BE', 'BO',
+  'PA', 'PI', 'PU', 'PE', 'PO',
+];
 
+/// 5音節 = 10文字。58音節なので 58^5 で約6億5000万通り
+const CODE_SYLLABLES = 5;
+
+/**
+ * 符号は秘密として機能するので、暗号論的に安全な乱数を使う。
+ * Math.random() は予測可能で、秘密の生成には使ってはいけない。
+ */
 function randomCode(): string {
   let code = '';
-  for (let i = 0; i < CODE_LENGTH; i += 1) {
-    code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];
+  for (let i = 0; i < CODE_SYLLABLES; i += 1) {
+    code += SYLLABLES[randomInt(SYLLABLES.length)];
   }
   return code;
 }
