@@ -1,147 +1,240 @@
-# 香りのしおり
+# 手のなか
 
-匂いを感じた瞬間の記憶を、その日の日記に「しおり」として挟み込む記録アプリ。
+**生きた手に握られている間だけ、文字が現れる手紙。**
 
-ハッカソンテーマ **「AIにできないこと」** への回答として、
-**AIを一切使わない** ことを設計方針にしている。
-匂いの言語化と記憶の想起はAIには原理的に体験できない領域であり、
-解釈・要約・レコメンドを挟まず、ユーザー自身の言葉だけで完結する。
+置くと止まる。飛ばせない。要約できない。
+送り主に返るのは内容への返信ではなく、生きた手がその手紙を握っていた時間だけ。
 
-詳細な要件は [docs/要件定義書.md](docs/要件定義書.md) を参照。
+ハッカソンテーマ **「AIにできないこと」** への回答。
+設計の考え方は [docs/要件定義書.md](docs/要件定義書.md) に書いた。
 
-## 体験の核
+## テーマへの立脚点
 
-- 過去のページをスワイプで遡っている途中で、しおりが挟まっているページに**偶然出会う**
-- しおりの存在は事前にわからない。ページを開いた **0.3秒後** にアイコンがフェードインして初めて気づく
-- 一覧・検索・フィルタは意図的に持たせていない(見つけてしまうと「出会う」体験にならない)
+「AIのほうが下手なこと」を探すと必ず来年には追い抜かれる。
+だから **構造的に不可能なこと** を機構に組み込んだ。
+
+判定に使った問いはこれ。
+
+> **このアプリを、AIエージェントは使えるか?**
+
+答えは **使えない**。埋めるフォームがあるかどうかではなく、
+送信と読解の両方が**身体の状態**を要求するため。
+
+| 行為 | 要求されるもの | AIに無いもの |
+|---|---|---|
+| 送る | 指を当てて脈が測れること | 脈 |
+| 読む | 端末を握り続けること | 手 |
+
+いずれも**信号処理だけ**で実装している。HealthKit も CoreML も LLM も使っていない
+(心拍数すら、カメラの生のピクセルから自分で計算している)。
+
+## 体験の流れ
+
+1. 手紙を書く
+2. **背面カメラのレンズに指を当てる。** 脈が2秒安定すると封が押され、その拍数が手紙に刻まれる
+3. 発行された符号(例 `HANA`)を相手に口で伝える
+4. 相手が符号を入れると、**手に持っている間だけ**毎秒10文字ずつ文字が現れる。
+   机に置くと3秒後に止まる。拾い上げると再開する
+5. 最後まで現れると、日付・署名・宛名が間を置いて浮かび上がる
+6. 送り主に **握っていた時間・置かれた回数・読了したか** が返る
+
+まだ現れていない文字は**描画していない**ので、先を覗くこともスクリーンショットで
+先取りすることもできない。手紙の長さも分からないので、残りを推し量れない。
+
+## 計測の仕組み
+
+### 脈 — 光電容積脈波 (PPG)
+
+[`PulseSensor.swift`](ios/Tenonaka/Data/PulseSensor.swift)
+
+指の腹をレンズに当てると、指を透過した光がセンサに届く。心臓が血を送るたびに
+毛細血管の血液量が変わり、**画像の赤成分の平均**が心拍に合わせて上下する。
+
+1. 毎フレーム、中央 ROI の赤成分の平均を取る
+2. 移動平均を引いて明るさのドリフトを除去(ハイパス)
+3. 短い移動平均でノイズを潰す(ローパス)
+4. 不応期 0.30 秒を設けて山を検出
+5. 拍間隔の**中央値**から心拍数を出す(平均だと1つの誤検出でずれる)
+
+**露出とホワイトバランスを固定**するのが要点。自動のままだとカメラが血液量の変化を
+「明るさのブレ」として補正で打ち消してしまい、波形が出ない。
+
+当て方の失敗は原因を判別して指示を返す。誰に渡しても数秒で当てられるように。
+
+| 状態 | 表示 |
+|---|---|
+| 覆えていない | 背面のレンズを指の腹で覆う |
+| 外光が漏れている | レンズ全体を隙間なく覆う |
+| **押しつけすぎ**(血流が止まって波形が平坦) | 力を抜いて、そっと触れるだけ |
+| 拍がばらついている | 動かさずに待つ |
+| 光量不足 | 明るい場所で試す |
+
+ライトは**既定で消灯**。環境光で足りないと2秒判定してから、やむなく弱く点ける。
+
+### 微動 — 生理的微動 (8〜12Hz)
+
+[`TremorSensor.swift`](ios/Tenonaka/Data/TremorSensor.swift)
+
+人間の手には常に 8〜12Hz の細かい震えがある。運動単位の発火に由来する不随意なもので、
+止めようとしても止まらない。机に置いた端末には存在しない。
+
+加速度と角速度を 100Hz で取り、1秒窓にハン窓をかけて **Goertzel 法**で
+8〜12Hz の各周波数だけを直接計算する(FFT を持ち出すほどの帯域数ではない)。
+
+iPhone 15 での実測値:
+
+| 条件 | 8〜12Hz の強さ | 「置く」比 |
+|---|---|---|
+| 手に持つ | 0.00352 | **23倍** |
+| 机に肘をついて構える | 0.00184 | **12倍** |
+| 持って歩く | 0.02512 | 167倍 |
+| 机に置く | 0.00015 | — |
+
+しきい値は **0.0008**。「置く」の5.3倍上、「机に構える」の2.3倍下で、両側に余裕がある。
+
+離す判定だけ **3秒遅らせている**(非対称なヒステリシス)。読書中の一瞬の取りこぼしで
+文字が止まると体験が壊れるが、再開は即時でよいため。
 
 ## 構成
 
 ```
-Nioi/
-├── docker-compose.yml       PostgreSQL (ポート 5433)
-├── server/                  NestJS + Prisma
+tenonaka/
+├── docker-compose.yml          ローカル用 PostgreSQL (ポート 5433)
+├── server/                     NestJS + Prisma
+│   ├── Dockerfile              マルチステージ。App Runner にそのまま載る
 │   ├── prisma/schema.prisma
-│   ├── prisma/seed.ts       デモ用の過去ページ
-│   └── src/
-└── ios/                     Swift / SwiftUI
-    ├── KaoriNoShiori.xcodeproj
+│   ├── prisma/migrations/
+│   └── src/letters/            手紙・封印・読了報告
+└── ios/                        Swift / SwiftUI
+    ├── Tenonaka.xcodeproj
     ├── Supporting/Info.plist
-    └── KaoriNoShiori/
-        ├── Models/          CalendarDay, ScentTag, DiaryPage
-        ├── Data/            PageRepository, PageStore, PageCache
-        ├── Theme/           紙の質感・明朝体
-        └── Views/           起動演出, ページャ, しおり
+    └── Tenonaka/
+        ├── Models/Letter.swift
+        ├── Data/               PulseSensor, TremorSensor, LetterStore
+        ├── Theme/              紙の質感・明朝体
+        └── Views/              書く・封をする・読む
 ```
 
-## 起動手順
+## 動かし方
 
-### 1. バックエンド
+### ローカル
 
 ```bash
-docker compose up -d                  # PostgreSQL (localhost:5433)
+docker compose up -d
 cd server
 npm install
-npx prisma generate
-npx prisma db push
-npm run seed                          # デモ用の過去ページを入れる(任意)
-npm run dev                           # http://localhost:3100
+cp .env.example .env
+npx prisma migrate deploy
+npm run dev                      # http://localhost:3100
 ```
-
-ポートは `server/.env` の `PORT` で変更できる(3000 は他プロセスと衝突しやすいため 3100)。
-
-### 2. iOS(シミュレータ)
 
 ```bash
-open ios/KaoriNoShiori.xcodeproj
+open ios/Tenonaka.xcodeproj
 ```
 
-iPhone シミュレータを選んで実行する。接続先の既定値は `http://localhost:3100`。
+**脈と微動はシミュレータでは測れません**(カメラも加速度センサも無い)。実機が必要。
 
-### 3. iOS(実機)
+### 実機
 
 署名は自動署名で設定済み(`DEVELOPMENT_TEAM = XXXXXXXXXX`)。
 
-1. iPhone を USB で Mac に繋ぎ、初回は「このコンピュータを信頼」を許可する
-2. Xcode の実行先で自分の iPhone を選んで実行
-3. iPhone の **設定 → 一般 → VPN とデバイス管理** で開発者アプリを信頼する(初回のみ)
-4. 起動後、**日付を長押し**して「接続先」に Mac の IP を入れて「つなぐ」
-
-接続先はビルド設定 `NIOI_API_BASE_URL` の値が既定になる。実機で毎回入れ直したくない場合はここを
-Mac の IP(例 `http://192.168.0.5:3100`)に変える。アプリ内で入れた値はそれを上書きする。
-
-Mac の IP は `ipconfig getifaddr en0` で確認できる。iPhone と Mac が同じ Wi-Fi にいること、
-Mac のファイアウォールが `node` の受信を許可していることが前提。
-
-初回の接続時に「ローカルネットワーク上のデバイスの検索」を求めるダイアログが出るので許可する。
-
-> サーバー無しでも起動する(ローカルキャッシュで動き、書いた内容は復帰後に再送される)。
-> 指の操作だけ確かめたいならバックエンドを立てなくてもよい。
-
-## 動作確認済みの経路
-
-- 日記の保存 / しおりの保存 / しおりを抜く → PostgreSQL まで反映
-- 日記だけの保存でしおりが消えない(逆も同様)
-- サーバー停止中に書いた内容はローカルに残り、復帰後の起動で自動再送される
-- 未記入の日は「白紙のページ」として表示され、DBに行を作らない
-
-## デモ用の起動フラグ (Debug ビルドのみ)
-
-任意の状態から起動できる。ステージ上で操作をミスしても即座に見せたい画面に戻せる。
+iOS 16 以降は **デベロッパモード** が必要:
+設定 → プライバシーとセキュリティ → デベロッパモード → オン → 再起動。
+項目が見えないときは、一度 Xcode から実行を試みると現れる。
 
 ```bash
-SIMCTL_CHILD_SKIP_COVER=1 \
-SIMCTL_CHILD_START_DAY=2026-07-21 \
-SIMCTL_CHILD_AUTO_REVEAL=1 \
-xcrun simctl launch booted dev.takao.kaorinoshiori
+cd ios
+xcodebuild -project Tenonaka.xcodeproj -scheme Tenonaka \
+  -destination 'id=<DEVICE_UDID>' -configuration Debug \
+  TENONAKA_API_BASE_URL="https://SERVICE_ID.ap-northeast-1.awsapprunner.com" \
+  -allowProvisioningUpdates build
+
+xcrun devicectl device install app --device <DEVICE_ID> <APP_PATH>
+```
+
+接続先はビルド設定 `TENONAKA_API_BASE_URL` が既定値になる。
+**ホーム画面のタイトル「手のなか」を長押し**すると実行中に差し替えられる
+(会場で接続先が変わったとき用の逃げ道)。
+
+## 本番環境 (AWS)
+
+| | |
+|---|---|
+| API | `https://SERVICE_ID.ap-northeast-1.awsapprunner.com` |
+| 実行 | App Runner `tenonaka-api` (0.5 vCPU / 1GB) |
+| DB | RDS PostgreSQL 18.3 `tenonaka-db`(非公開・単一AZ) |
+| 経路 | App Runner → VPC コネクタ → RDS。SG 参照で 5432 のみ許可 |
+| リージョン | ap-northeast-1 |
+
+**App Runner を選んだ理由は HTTPS。** AWS でドメインを持たずに有効な証明書つき
+エンドポイントが得られるのはここだけで、ALB や EC2 は ACM 証明書=自前ドメインが必要になる。
+常時起動なのでコールドスタートも無い。
+
+### 更新手順
+
+```bash
+source ~/.tenonaka-deploy.env
+cd server
+docker buildx build --platform linux/amd64 --provenance=false --sbom=false \
+  -t ${ACCOUNT}.dkr.ecr.${AWS_REGION}.amazonaws.com/tenonaka-api:latest --push .
+aws apprunner start-deployment --service-arn "$SERVICE_ARN"
+```
+
+`--provenance=false --sbom=false` は**毎回必要**。付けないと buildx が
+OCI image index (マニフェストリスト) を作り、**App Runner が pull できない**。
+
+`--platform linux/amd64` も必須(App Runner は x86_64、開発機は arm64)。
+
+起動時に `prisma migrate deploy` が走る。
+
+### 構築時に踏んだ落とし穴
+
+- **App Runner は `apne1-az3` に対応していない。** VPC コネクタのサブネットは
+  `ap-northeast-1c` (apne1-az1) と `1d` (apne1-az2) を使う。論理AZ名ではなく物理AZで判断する
+- **`AWSServiceRoleForAppRunner` は自動作成されない。** VPC コネクタ作成時に
+  ネットワーク用のロールだけが作られるので、本体用は `create-service-linked-role` で明示的に作る
+- **zsh では `$ACCOUNT:role/...` が壊れる。** `:r` がパラメータ修飾子として解釈されるため
+  `${ACCOUNT}` と囲む必要がある
+
+## API
+
+認証は `x-user-id` ヘッダのみ(未指定なら `local-user`)。
+端末ごとに UUID を発行して送っている。レート制限は 60回/分。
+
+| メソッド | パス | 内容 |
+|---|---|---|
+| POST | `/letters` | 手紙を送る。**`senderBpm` は必須**(脈が無いと送れない) |
+| GET | `/letters/:code` | 符号で受け取る。大文字小文字を問わない |
+| POST | `/letters/:code/receipt` | 読まれ方を返す |
+| GET | `/letters/sent` | 自分が送った手紙と読まれ方 |
+| GET | `/health` | 死活確認 |
+
+符号は `I O 0 1` を除いた文字から5文字。声で伝える前提なので見間違えを避けている。
+`code` を指定して作ることもできる(デモで覚えやすい符号を使うため)。
+
+読了報告は**上書きではなく、より長く握られた記録が残る**。読み直しで時間が減らないように。
+
+## 動作確認用の起動フラグ (Debug ビルドのみ)
+
+```bash
+xcrun devicectl device process launch --device <DEVICE_ID> --terminate-existing \
+  --environment-variables '{"LETTER":"1"}' dev.takao.tenonaka
 ```
 
 | 環境変数 | 内容 |
 |---|---|
-| `SKIP_COVER=1` | 本を開く演出を飛ばす |
-| `START_DAY=YYYY-MM-DD` | その日のページから始める |
-| `AUTO_REVEAL=1` | しおりを展開した状態で始める |
-| `AUTO_SHEET=bookmark` / `diary` / `connection` | しおり入力 / 日記入力 / 接続先設定を開いた状態で始める |
-| `HOLD_TURN=0.45` | ページめくりを途中で止める(見た目の確認用) |
+| `LETTER=1` | サンプルの手紙を読む画面だけを出す |
+| `PULSE_TEST=1` | 脈の検証画面(波形・心拍数・当て方の指示・明るさ) |
+| `TREMOR_TEST=1` | 微動の検証画面(帯域エネルギー・しきい値スライダ) |
 
-## API
+シミュレータの場合は `SIMCTL_CHILD_` 接頭辞をつけて `xcrun simctl launch` に渡す。
 
-いずれも認証は `x-user-id` ヘッダのみ(未指定なら `local-user`)。
+## 正直な限界
 
-| メソッド | パス | 内容 |
-|---|---|---|
-| GET | `/pages/:date` | 指定日のページ。未記入なら空ボディ |
-| PUT | `/pages/:date` | 指定日のページを更新 |
-| GET | `/pages?from=&to=` | 日付範囲を一括取得(ページャの先読み) |
-| GET | `/pages?before=&limit=` | 過去ページを遡って取得 |
-| GET | `/health` | 死活確認 |
-
-PUT のボディはフィールドの**有無に意味がある**:
-
-```jsonc
-{ "diaryText": "…" }          // 日記だけ更新。しおりは触らない
-{ "bookmark": { "tag": "SWEET", "scentText": "…", "memoryText": "…" } }
-{ "bookmark": null }          // しおりを抜く
-```
-
-日記の自動保存としおりの保存が互いを消し合わないようにするための仕様。
-
-## 実装上の判断
-
-- **ページめくり**: 綴じ側(左)を軸に 0°→-90° まで回す 3D 回転。-90° でページは幅ゼロになるので、
-  そのタイミングで日付を差し替えると継ぎ目が見えず、裏面が鏡文字になる問題も起きない
-- **日付の型**: `CalendarDay`(年月日のみの値型)。`Date` を識別子にせず、
-  タイムゾーンや夏時間でページがズレる問題を構造的に排除している
-- **読む画面と書く画面を分けた**: ページ上で直接編集すると、めくりのドラッグと
-  テキスト編集がジェスチャーを取り合うため
-- **しおりのボタンを出す条件**: しおりのあるページには「挟む」ボタンを出さない。
-  「直す」と表示してしまうと、開く前にしおりの存在がバレて発見の演出が壊れる
-- **タグにアイコンを使わない**: アイコンは匂いの意味を説明してしまう。
-  色のついた印だけにして、言語化はユーザーの言葉に委ねる
-
-## 今後の候補(MVP スコープ外)
-
-- プッシュ通知・リマインド
-- 検索・フィルタ(体験の核と衝突するため慎重に)
-- 複数ユーザー・しおりの共有
-- 地図表示
+- **これは DRM ではない。** 別の端末で撮影して要約させることは可能で、技術的に防げない。
+  この機構が保証するのは「防止」ではなく **「費やされたかどうかの申告」**
+- **なりすましは防げない。** 脈は個人識別に使えない(常に変動し、他人と重なる)。
+  証明できるのは「生きた身体がその瞬間そこに居たこと」までで、それが誰かは分からない
+- **医療的な精度は主張しない。** 心拍数は妥当な値が出ることを確認しただけで、
+  正解と突き合わせた検証はしていない
+- 微動の判定はバイブレーターで偽装しうる。脈より弱い証明である
