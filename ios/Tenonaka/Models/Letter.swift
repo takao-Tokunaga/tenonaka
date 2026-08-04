@@ -10,6 +10,8 @@ struct Letter: Identifiable, Hashable, Sendable {
     var senderName: String?
     /// 宛名(受取人)
     var recipientName: String?
+    /// 宛先の住所。符号で渡した手紙では nil
+    var recipientAddress: String?
     /// 封をした瞬間の脈
     var senderBpm: Double?
     var sentAt: Date
@@ -40,6 +42,8 @@ struct Letter: Identifiable, Hashable, Sendable {
 struct ReceivedLetter: Identifiable, Hashable, Sendable {
     var code: String
     var senderName: String?
+    /// 自分の住所に届いた手紙かどうかの手がかり
+    var recipientAddress: String?
     var sentAt: Date
     var claimedAt: Date?
     /// 封をした瞬間の送り主の脈

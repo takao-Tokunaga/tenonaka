@@ -49,17 +49,33 @@ struct LetterRepository {
         session = URLSession(configuration: configuration)
     }
 
+    /// 自分の住所。持っていなければサーバーが発行する。何度呼んでも同じ値
+    func myAddress() async throws -> String {
+        struct Response: Decodable { let address: String }
+        let data = try await send(path: "letters/address", method: "POST")
+        guard let decoded = try? JSONDecoder().decode(Response.self, from: data) else {
+            throw LetterError.decoding
+        }
+        return decoded.address
+    }
+
     /// 脈を渡さないと送れない。ここがこのアプリの関門なので、引数から外せないようにしてある。
+    ///
+    /// recipientAddress を渡すと相手の棚に直接届く。渡さなければ符号で手渡しする。
     func send(
         body: String,
         senderName: String?,
         recipientName: String?,
+        recipientAddress: String?,
         bpm: Double
     ) async throws -> Letter {
         var payload: [String: Any] = ["body": body, "senderBpm": bpm]
         if let senderName = senderName?.nilIfBlank { payload["senderName"] = senderName }
         if let recipientName = recipientName?.nilIfBlank {
             payload["recipientName"] = recipientName
+        }
+        if let recipientAddress = recipientAddress?.nilIfBlank {
+            payload["recipientAddress"] = recipientAddress.trimmed.lowercased()
         }
 
         let data = try await send(
@@ -166,6 +182,7 @@ private struct LetterDTO: Decodable {
     let body: String
     let senderName: String?
     let recipientName: String?
+    let recipientAddress: String?
     let senderBpm: Double?
     let sentAt: String
     let claimedAt: String?
@@ -177,6 +194,7 @@ private struct LetterDTO: Decodable {
             body: body,
             senderName: senderName,
             recipientName: recipientName,
+            recipientAddress: recipientAddress,
             senderBpm: senderBpm,
             sentAt: ISO8601.date(from: sentAt) ?? Date(),
             claimedAt: claimedAt.flatMap(ISO8601.date(from:)),
@@ -196,6 +214,7 @@ private struct LetterDTO: Decodable {
 private struct ReceivedLetterDTO: Decodable {
     let code: String
     let senderName: String?
+    let recipientAddress: String?
     let senderBpm: Double?
     let sentAt: String
     let claimedAt: String?
@@ -205,6 +224,7 @@ private struct ReceivedLetterDTO: Decodable {
         ReceivedLetter(
             code: code,
             senderName: senderName,
+            recipientAddress: recipientAddress,
             sentAt: ISO8601.date(from: sentAt) ?? Date(),
             claimedAt: claimedAt.flatMap(ISO8601.date(from:)),
             senderBpm: senderBpm,

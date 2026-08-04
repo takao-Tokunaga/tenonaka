@@ -5,6 +5,7 @@ struct LetterComposeView: View {
     @EnvironmentObject private var store: LetterStore
     @Environment(\.dismiss) private var dismiss
 
+    @State private var recipientAddress = ""
     @State private var recipientName = ""
     @State private var senderName = ""
     @State private var body_ = ""
@@ -28,6 +29,7 @@ struct LetterComposeView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
+                        addressField
                         field("宛名", placeholder: "誰へ", text: $recipientName)
 
                         ZStack(alignment: .topLeading) {
@@ -104,6 +106,40 @@ struct LetterComposeView: View {
         .padding(.bottom, 18)
     }
 
+    /// 宛先の住所。空なら符号を口で伝えて渡す
+    private var addressField: some View {
+        VStack(alignment: .leading, spacing: 7) {
+            HStack(alignment: .lastTextBaseline) {
+                Text("宛先")
+                    .font(Mincho.font(11.5))
+                    .kerning(1.5)
+                    .foregroundStyle(Paper.inkFaint)
+                Spacer()
+                Text(recipientAddress.trimmed.isEmpty ? "空なら符号で渡す" : "相手の棚に直接届く")
+                    .font(Mincho.font(10.5))
+                    .foregroundStyle(Paper.inkFaint.opacity(0.8))
+            }
+
+            TextField("komorebi-nagisa-shigure", text: $recipientAddress)
+                .font(.system(size: 15, design: .monospaced))
+                .foregroundStyle(Paper.ink)
+                .tint(Paper.ribbon)
+                .textInputAutocapitalization(.never)
+                .autocorrectionDisabled()
+                .onChange(of: recipientAddress) { _, value in
+                    // 住所は小文字とハイフンだけ
+                    recipientAddress = value.lowercased()
+                        .filter { $0.isLetter || $0 == "-" }
+                }
+                .padding(.bottom, 7)
+                .overlay(alignment: .bottom) {
+                    Rectangle()
+                        .fill(Paper.rule.opacity(0.7))
+                        .frame(height: 0.6)
+                }
+        }
+    }
+
     private func field(_ label: String, placeholder: String, text: Binding<String>) -> some View {
         VStack(alignment: .leading, spacing: 7) {
             Text(label)
@@ -131,6 +167,7 @@ struct LetterComposeView: View {
                 body: body_,
                 senderName: senderName.nilIfBlank,
                 recipientName: recipientName.nilIfBlank,
+                recipientAddress: recipientAddress.nilIfBlank,
                 bpm: bpm
             )
             sentLetter = letter
@@ -160,21 +197,34 @@ struct SentCodeView: View {
                     .font(Mincho.font(15))
                     .foregroundStyle(Paper.inkSoft)
 
-                Text(letter.code)
-                    .font(.system(
-                        size: letter.code.count > 8 ? 34 : 50,
-                        weight: .semibold,
-                        design: .serif
-                    ))
-                    .kerning(letter.code.count > 8 ? 3 : 8)
-                    .foregroundStyle(Paper.ink)
-                    .minimumScaleFactor(0.6)
-                    .lineLimit(1)
-                    .padding(.horizontal, 24)
+                // 宛先を指定した手紙は既に届いているので、符号は主役ではない
+                if let address = letter.recipientAddress {
+                    Text(address)
+                        .font(.system(size: 21, design: .monospaced))
+                        .foregroundStyle(Paper.ink)
+                        .multilineTextAlignment(.center)
+                        .padding(.horizontal, 24)
 
-                Text("この符号を相手に声で伝えてください")
-                    .font(Mincho.font(12.5))
-                    .foregroundStyle(Paper.inkFaint)
+                    Text("この住所に届きました")
+                        .font(Mincho.font(12.5))
+                        .foregroundStyle(Paper.inkFaint)
+                } else {
+                    Text(letter.code)
+                        .font(.system(
+                            size: letter.code.count > 8 ? 34 : 50,
+                            weight: .semibold,
+                            design: .serif
+                        ))
+                        .kerning(letter.code.count > 8 ? 3 : 8)
+                        .foregroundStyle(Paper.ink)
+                        .minimumScaleFactor(0.6)
+                        .lineLimit(1)
+                        .padding(.horizontal, 24)
+
+                    Text("この符号を相手に声で伝えてください")
+                        .font(Mincho.font(12.5))
+                        .foregroundStyle(Paper.inkFaint)
+                }
 
                 if let bpm = letter.senderBpm {
                     Text("脈 \(Int(bpm.rounded())) で封をされました")

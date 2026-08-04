@@ -7,6 +7,17 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+/// 住所。
+///
+/// 端末ごとに一度だけ発行し、以後変わらない。現実の住所と同じく、
+/// 知っている相手からは誰でも手紙が届く。
+/// 意味のある言葉を3つ繋いだ形(komorebi-nagisa-shigure)。
+model Address {
+  address   String   @id
+  userId    String   @unique
+  createdAt DateTime @default(now())
+}
+
 /// 手紙。
 ///
 /// 送るときに書いた人の脈が刻まれ(生きた身体が送った証)、
@@ -19,6 +30,9 @@ model Letter {
   body          String
   senderName    String?
   recipientName String?
+  /// 宛先の住所。指定して送った場合、受取人は作成時点で確定する
+  /// (符号を推測される余地が無くなる)
+  recipientAddress String?
   /// 封をした瞬間の脈
   senderBpm     Float?
   senderUserId  String

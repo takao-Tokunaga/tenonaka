@@ -89,6 +89,41 @@ struct HomeView: View {
             Rectangle()
                 .fill(Paper.rule.opacity(0.6))
                 .frame(width: 54, height: 0.8)
+
+            myAddressPlate
+                .padding(.top, 10)
+        }
+    }
+
+    /// 自分の住所。これを相手に教えると手紙が届く
+    private var myAddressPlate: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("あなたの住所")
+                .font(Mincho.font(10.5))
+                .kerning(1.5)
+                .foregroundStyle(Paper.inkFaint)
+
+            if let address = store.myAddress {
+                Text(address)
+                    .font(.system(size: 15, design: .monospaced))
+                    .foregroundStyle(Paper.ink)
+                    .textSelection(.enabled)
+            } else {
+                Text("——")
+                    .font(.system(size: 15, design: .monospaced))
+                    .foregroundStyle(Paper.inkFaint.opacity(0.6))
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 11)
+        .background {
+            RoundedRectangle(cornerRadius: 3)
+                .fill(Paper.base.opacity(0.45))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 3)
+                        .stroke(Paper.rule.opacity(0.6), lineWidth: 0.6)
+                }
         }
     }
 

@@ -8,6 +8,7 @@ import {
 import { Letter } from '@prisma/client';
 import { randomInt } from 'node:crypto';
 import { PrismaService } from '../prisma/prisma.service';
+import { AddressesService } from './addresses.service';
 import { CreateLetterDto } from './dto/create-letter.dto';
 import { ReadReceiptDto } from './dto/read-receipt.dto';
 
@@ -41,7 +42,7 @@ const SYLLABLES = [
 const CODE_SYLLABLES = 5;
 
 /// /letters/:code と衝突する経路名。指定符号として使わせない
-const RESERVED_CODES = new Set(['SENT', 'RECEIVED', 'HEALTH']);
+const RESERVED_CODES = new Set(['SENT', 'RECEIVED', 'ADDRESS', 'HEALTH']);
 
 /**
  * 符号は秘密として機能するので、暗号論的に安全な乱数を使う。
@@ -57,7 +58,10 @@ function randomCode(): string {
 
 @Injectable()
 export class LettersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly addresses: AddressesService,
+  ) {}
 
   /// 読む側に返す形。送り主の情報のうち、読み手に見せるものだけ。
   private toReaderResponse(letter: Letter) {
@@ -80,6 +84,7 @@ export class LettersService {
       body: letter.body,
       senderName: letter.senderName,
       recipientName: letter.recipientName,
+      recipientAddress: letter.recipientAddress,
       senderBpm: letter.senderBpm,
       sentAt: letter.sentAt.toISOString(),
       // 受け取られたか(読み終えたかとは別の状態)
@@ -97,6 +102,30 @@ export class LettersService {
   }
 
   async create(userId: string, dto: CreateLetterDto) {
+    // 宛先が指定されていれば、受取人を作成時点で確定させる。
+    // こうすると符号を推測される余地が無くなる
+    let claimedByUserId: string | null = null;
+    let recipientAddress: string | null = null;
+
+    if (dto.recipientAddress) {
+      recipientAddress = dto.recipientAddress.trim().toLowerCase();
+      claimedByUserId = await this.addresses.resolve(recipientAddress);
+      if (claimedByUserId === null) {
+        throw new NotFoundException(`住所 ${recipientAddress} は見つかりません`);
+      }
+    }
+
+    const shared = {
+      body: dto.body,
+      senderName: dto.senderName ?? null,
+      recipientName: dto.recipientName ?? null,
+      recipientAddress,
+      senderBpm: dto.senderBpm,
+      senderUserId: userId,
+      claimedByUserId,
+      claimedAt: claimedByUserId === null ? null : new Date(),
+    };
+
     // 符号を指定された場合は引き直さず、埋まっていればそのまま失敗させる
     if (dto.code) {
       const code = dto.code.toUpperCase();
@@ -108,14 +137,7 @@ export class LettersService {
         throw new ConflictException(`符号 ${code} は既に使われています`);
       }
       const letter = await this.prisma.letter.create({
-        data: {
-          code,
-          body: dto.body,
-          senderName: dto.senderName ?? null,
-          recipientName: dto.recipientName ?? null,
-          senderBpm: dto.senderBpm,
-          senderUserId: userId,
-        },
+        data: { ...shared, code },
       });
       return this.toSenderResponse(letter);
     }
@@ -127,14 +149,7 @@ export class LettersService {
       if (existing) continue;
 
       const letter = await this.prisma.letter.create({
-        data: {
-          code,
-          body: dto.body,
-          senderName: dto.senderName ?? null,
-          recipientName: dto.recipientName ?? null,
-          senderBpm: dto.senderBpm,
-          senderUserId: userId,
-        },
+        data: { ...shared, code },
       });
       return this.toSenderResponse(letter);
     }
@@ -206,6 +221,7 @@ export class LettersService {
       code: letter.code,
       senderName: letter.senderName,
       recipientName: letter.recipientName,
+      recipientAddress: letter.recipientAddress,
       senderBpm: letter.senderBpm,
       sentAt: letter.sentAt.toISOString(),
       claimedAt: letter.claimedAt?.toISOString() ?? null,

@@ -8,13 +8,27 @@ final class LetterStore: ObservableObject {
     @Published private(set) var sent: [Letter] = []
     /// 自分が受け取った手紙の控え。本文は持たない
     @Published private(set) var received: [ReceivedLetter] = []
+    /// 自分の住所。相手に教えると手紙が届く
+    @Published private(set) var myAddress: String?
     @Published private(set) var isOffline = false
 
     private let repository = LetterRepository()
 
     func refresh() async {
+        await ensureAddress()
         await refreshReceived()
         await refreshSent()
+    }
+
+    /// 住所を確保する。初回はサーバーが発行し、以後は同じ値が返る
+    func ensureAddress() async {
+        guard myAddress == nil else { return }
+        do {
+            myAddress = try await repository.myAddress()
+            isOffline = false
+        } catch {
+            isOffline = true
+        }
     }
 
     func refreshSent() async {
@@ -39,12 +53,14 @@ final class LetterStore: ObservableObject {
         body: String,
         senderName: String?,
         recipientName: String?,
+        recipientAddress: String?,
         bpm: Double
     ) async throws -> Letter {
         let letter = try await repository.send(
             body: body,
             senderName: senderName,
             recipientName: recipientName,
+            recipientAddress: recipientAddress,
             bpm: bpm
         )
         isOffline = false

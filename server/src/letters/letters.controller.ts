@@ -7,13 +7,17 @@ import {
   Param,
   Post,
 } from '@nestjs/common';
+import { AddressesService } from './addresses.service';
 import { CreateLetterDto } from './dto/create-letter.dto';
 import { ReadReceiptDto } from './dto/read-receipt.dto';
 import { LettersService } from './letters.service';
 
 @Controller('letters')
 export class LettersController {
-  constructor(private readonly letters: LettersService) {}
+  constructor(
+    private readonly letters: LettersService,
+    private readonly addresses: AddressesService,
+  ) {}
 
   /**
    * 端末の識別子。
@@ -46,6 +50,20 @@ export class LettersController {
   @Get('sent')
   async listSent(@Headers('x-user-id') userId: string | undefined) {
     return this.letters.listSent(this.requireUserId(userId));
+  }
+
+  /**
+   * 自分の住所。持っていなければ発行する。
+   *
+   * POST にしているのは、初回に住所を作る副作用があるため。
+   * 二回目以降は同じ住所を返すので何度呼んでも安全。
+   */
+  @Post('address')
+  async myAddress(@Headers('x-user-id') userId: string | undefined) {
+    const address = await this.addresses.ensureForUser(
+      this.requireUserId(userId),
+    );
+    return { address };
   }
 
   /// 自分が受け取った手紙の一覧。本文は含まない(読むには取り直させる)
