@@ -8,7 +8,6 @@ import {
   Min,
   MinLength,
 } from 'class-validator';
-import { ADDRESS_PATTERN } from '../address-words';
 
 export class CreateLetterDto {
   /**
@@ -43,16 +42,18 @@ export class CreateLetterDto {
   recipientName?: string;
 
   /**
-   * 宛先の住所(komorebi-nagisa-shigure)。
+   * 宛先の住所(みなと・こずえ・かね)。
    *
    * 指定すると相手の棚に直接届き、受取人が作成時点で確定する。
    * 省略した場合は符号を口で伝えて渡す。
+   *
+   * 形式の検証はここではせず、サービス側で正規化して引く。
+   * 相手から聞いて打つものなので、かな・カナ・ローマ字や区切り記号の
+   * 揺れを吸収したうえで「見つからない」と答えたい。
    */
   @IsOptional()
   @IsString()
-  @Matches(ADDRESS_PATTERN, {
-    message: 'recipientAddress must look like word-word-word (lowercase)',
-  })
+  @MaxLength(80)
   recipientAddress?: string;
 
   /// 封をした瞬間の脈。これが無い手紙は作れない

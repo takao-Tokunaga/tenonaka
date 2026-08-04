@@ -107,12 +107,16 @@ export class LettersService {
     let claimedByUserId: string | null = null;
     let recipientAddress: string | null = null;
 
-    if (dto.recipientAddress) {
-      recipientAddress = dto.recipientAddress.trim().toLowerCase();
-      claimedByUserId = await this.addresses.resolve(recipientAddress);
-      if (claimedByUserId === null) {
-        throw new NotFoundException(`住所 ${recipientAddress} は見つかりません`);
+    if (dto.recipientAddress?.trim()) {
+      const resolved = await this.addresses.resolve(dto.recipientAddress);
+      if (resolved === null) {
+        throw new NotFoundException(
+          `住所「${dto.recipientAddress.trim()}」は見つかりません`,
+        );
       }
+      // 表記の揺れを吸収した正規表記で保存する
+      recipientAddress = resolved.address;
+      claimedByUserId = resolved.userId;
     }
 
     const shared = {

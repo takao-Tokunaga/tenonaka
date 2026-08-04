@@ -120,17 +120,14 @@ struct LetterComposeView: View {
                     .foregroundStyle(Paper.inkFaint.opacity(0.8))
             }
 
-            TextField("komorebi-nagisa-shigure", text: $recipientAddress)
-                .font(.system(size: 15, design: .monospaced))
+            // 表記の揺れはサーバー側で正規化するので、ここでは削らない。
+            // かな・カナ・ローマ字、区切りの違いをそのまま通す
+            TextField("みなと・こずえ・かね", text: $recipientAddress)
+                .font(Mincho.font(17))
                 .foregroundStyle(Paper.ink)
                 .tint(Paper.ribbon)
                 .textInputAutocapitalization(.never)
                 .autocorrectionDisabled()
-                .onChange(of: recipientAddress) { _, value in
-                    // 住所は小文字とハイフンだけ
-                    recipientAddress = value.lowercased()
-                        .filter { $0.isLetter || $0 == "-" }
-                }
                 .padding(.bottom, 7)
                 .overlay(alignment: .bottom) {
                     Rectangle()
@@ -200,7 +197,8 @@ struct SentCodeView: View {
                 // 宛先を指定した手紙は既に届いているので、符号は主役ではない
                 if let address = letter.recipientAddress {
                     Text(address)
-                        .font(.system(size: 21, design: .monospaced))
+                        .font(Mincho.font(24))
+                        .kerning(1.5)
                         .foregroundStyle(Paper.ink)
                         .multilineTextAlignment(.center)
                         .padding(.horizontal, 24)

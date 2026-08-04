@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// 入口。手紙を書くか、符号で受け取るか。
 ///
@@ -15,6 +16,7 @@ struct HomeView: View {
     @State private var openedLetter: Letter?
     @State private var openingCode: String?
     @State private var failureText: String?
+    @State private var didCopyAddress = false
 
     var body: some View {
         ZStack {
@@ -97,21 +99,43 @@ struct HomeView: View {
 
     /// 自分の住所。これを相手に教えると手紙が届く
     private var myAddressPlate: some View {
-        VStack(alignment: .leading, spacing: 6) {
-            Text("あなたの住所")
-                .font(Mincho.font(10.5))
-                .kerning(1.5)
-                .foregroundStyle(Paper.inkFaint)
+        HStack(alignment: .bottom) {
+            VStack(alignment: .leading, spacing: 6) {
+                Text("あなたの住所")
+                    .font(Mincho.font(10.5))
+                    .kerning(1.5)
+                    .foregroundStyle(Paper.inkFaint)
 
+                if let address = store.myAddress {
+                    Text(address)
+                        .font(Mincho.font(17))
+                        .kerning(1)
+                        .foregroundStyle(Paper.ink)
+                        .textSelection(.enabled)
+                } else {
+                    Text("——")
+                        .font(Mincho.font(17))
+                        .foregroundStyle(Paper.inkFaint.opacity(0.6))
+                }
+            }
+
+            Spacer()
+
+            // かなを打つのは手間なので、写して渡せるようにする
             if let address = store.myAddress {
-                Text(address)
-                    .font(.system(size: 15, design: .monospaced))
-                    .foregroundStyle(Paper.ink)
-                    .textSelection(.enabled)
-            } else {
-                Text("——")
-                    .font(.system(size: 15, design: .monospaced))
-                    .foregroundStyle(Paper.inkFaint.opacity(0.6))
+                Button {
+                    UIPasteboard.general.string = address
+                    withAnimation(.easeOut(duration: 0.2)) { didCopyAddress = true }
+                    Task {
+                        try? await Task.sleep(for: .seconds(1.6))
+                        withAnimation(.easeIn(duration: 0.4)) { didCopyAddress = false }
+                    }
+                } label: {
+                    Text(didCopyAddress ? "写した" : "写す")
+                        .font(Mincho.font(12))
+                        .foregroundStyle(didCopyAddress ? Paper.inkSoft : Paper.ribbon)
+                }
+                .buttonStyle(.plain)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -264,7 +288,7 @@ struct ReceivedLetterRow: View {
                         .foregroundStyle(Paper.ink)
 
                     Text(letter.code)
-                        .font(.system(size: 11.5, design: .monospaced))
+                        .font(.system(size: 11, design: .monospaced))
                         .foregroundStyle(Paper.inkFaint)
                 }
 

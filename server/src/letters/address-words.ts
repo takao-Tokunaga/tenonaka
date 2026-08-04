@@ -5,163 +5,212 @@
  * 紙・光・水・季節・記憶といった、この手紙の世界に合う言葉だけを集めている。
  * どの組み合わせでも情景になるよう、負の意味を持つ語は入れていない。
  *
- * ローマ字は曖昧さを避けて素直に綴る(長音記号は使わない)。
+ * 表記はひらがな。ローマ字も持たせているのは入力を寛容にするためで、
+ * 相手から聞いた住所をローマ字で打っても引けるようにしている。
  */
-export const ADDRESS_WORDS = [
+export interface AddressWord {
+  kana: string;
+  roman: string;
+}
+
+export const ADDRESS_WORDS: AddressWord[] = [
   // 光・天候
-  'komorebi', // 木漏れ日
-  'asahi', // 朝日
-  'yudachi', // 夕立
-  'kasumi', // 霞
-  'oboro', // 朧
-  'akatsuki', // 暁
-  'tasogare', // 黄昏
-  'yuyake', // 夕焼け
-  'hinata', // 日向
-  'kagero', // 陽炎
-  'tsukiyo', // 月夜
-  'hoshizora', // 星空
-  'amaoto', // 雨音
-  'kirisame', // 霧雨
-  'harusame', // 春雨
-  'shigure', // 時雨
-  'yukiakari', // 雪明かり
-  'tsuyu', // 露
-  'niji', // 虹
-  'kaze', // 風
-  'hayate', // 疾風
-  'nagi', // 凪
-  'hikage', // 日陰
-  'tsukikage', // 月影
+  { kana: 'こもれび', roman: 'komorebi' },
+  { kana: 'あさひ', roman: 'asahi' },
+  { kana: 'ゆうだち', roman: 'yudachi' },
+  { kana: 'かすみ', roman: 'kasumi' },
+  { kana: 'おぼろ', roman: 'oboro' },
+  { kana: 'あかつき', roman: 'akatsuki' },
+  { kana: 'たそがれ', roman: 'tasogare' },
+  { kana: 'ゆうやけ', roman: 'yuyake' },
+  { kana: 'ひなた', roman: 'hinata' },
+  { kana: 'かげろう', roman: 'kagero' },
+  { kana: 'つきよ', roman: 'tsukiyo' },
+  { kana: 'ほしぞら', roman: 'hoshizora' },
+  { kana: 'あまおと', roman: 'amaoto' },
+  { kana: 'きりさめ', roman: 'kirisame' },
+  { kana: 'はるさめ', roman: 'harusame' },
+  { kana: 'しぐれ', roman: 'shigure' },
+  { kana: 'ゆきあかり', roman: 'yukiakari' },
+  { kana: 'つゆ', roman: 'tsuyu' },
+  { kana: 'にじ', roman: 'niji' },
+  { kana: 'かぜ', roman: 'kaze' },
+  { kana: 'はやて', roman: 'hayate' },
+  { kana: 'なぎ', roman: 'nagi' },
+  { kana: 'ひかげ', roman: 'hikage' },
+  { kana: 'つきかげ', roman: 'tsukikage' },
 
   // 水・場所
-  'nagisa', // 渚
-  'minato', // 港
-  'izumi', // 泉
-  'kawara', // 河原
-  'mizube', // 水辺
-  'shimizu', // 清水
-  'umibe', // 海辺
-  'sazanami', // 細波
-  'komichi', // 小径
-  'ishidatami', // 石畳
-  'nonaka', // 野中
-  'okuyama', // 奥山
-  'satoyama', // 里山
-  'tanima', // 谷間
+  { kana: 'なぎさ', roman: 'nagisa' },
+  { kana: 'みなと', roman: 'minato' },
+  { kana: 'いずみ', roman: 'izumi' },
+  { kana: 'かわら', roman: 'kawara' },
+  { kana: 'みずべ', roman: 'mizube' },
+  { kana: 'しみず', roman: 'shimizu' },
+  { kana: 'うみべ', roman: 'umibe' },
+  { kana: 'さざなみ', roman: 'sazanami' },
+  { kana: 'こみち', roman: 'komichi' },
+  { kana: 'いしだたみ', roman: 'ishidatami' },
+  { kana: 'のなか', roman: 'nonaka' },
+  { kana: 'おくやま', roman: 'okuyama' },
+  { kana: 'さとやま', roman: 'satoyama' },
+  { kana: 'たにま', roman: 'tanima' },
 
   // 植物
-  'sakura', // 桜
-  'tsubaki', // 椿
-  'sumire', // 菫
-  'fuji', // 藤
-  'hasu', // 蓮
-  'susuki', // 芒
-  'momiji', // 紅葉
-  'wakaba', // 若葉
-  'kozue', // 梢
-  'kaede', // 楓
-  'yanagi', // 柳
-  'tsuta', // 蔦
-  'koke', // 苔
-  'take', // 竹
-  'matsu', // 松
-  'ume', // 梅
-  'kiku', // 菊
-  'yuri', // 百合
-  'asagao', // 朝顔
-  'himawari', // 向日葵
-  'tsukushi', // 土筆
-  'nanohana', // 菜の花
-  'kinmokusei', // 金木犀
-  'suzuran', // 鈴蘭
+  { kana: 'さくら', roman: 'sakura' },
+  { kana: 'つばき', roman: 'tsubaki' },
+  { kana: 'すみれ', roman: 'sumire' },
+  { kana: 'ふじ', roman: 'fuji' },
+  { kana: 'はす', roman: 'hasu' },
+  { kana: 'すすき', roman: 'susuki' },
+  { kana: 'もみじ', roman: 'momiji' },
+  { kana: 'わかば', roman: 'wakaba' },
+  { kana: 'こずえ', roman: 'kozue' },
+  { kana: 'かえで', roman: 'kaede' },
+  { kana: 'やなぎ', roman: 'yanagi' },
+  { kana: 'つた', roman: 'tsuta' },
+  { kana: 'こけ', roman: 'koke' },
+  { kana: 'たけ', roman: 'take' },
+  { kana: 'まつ', roman: 'matsu' },
+  { kana: 'うめ', roman: 'ume' },
+  { kana: 'きく', roman: 'kiku' },
+  { kana: 'ゆり', roman: 'yuri' },
+  { kana: 'あさがお', roman: 'asagao' },
+  { kana: 'ひまわり', roman: 'himawari' },
+  { kana: 'つくし', roman: 'tsukushi' },
+  { kana: 'なのはな', roman: 'nanohana' },
+  { kana: 'きんもくせい', roman: 'kinmokusei' },
+  { kana: 'すずらん', roman: 'suzuran' },
 
   // 時間・季節
-  'haru', // 春
-  'natsu', // 夏
-  'aki', // 秋
-  'fuyu', // 冬
-  'yoi', // 宵
-  'yonaka', // 夜半
-  'akegata', // 明け方
-  'hinode', // 日の出
-  'koharu', // 小春
-  'mahiru', // 真昼
-  'yugure', // 夕暮れ
-  'wakatsuki', // 若月
-  'tsuitachi', // 朔日
-  'nagatsuki', // 長月
+  { kana: 'はる', roman: 'haru' },
+  { kana: 'なつ', roman: 'natsu' },
+  { kana: 'あき', roman: 'aki' },
+  { kana: 'ふゆ', roman: 'fuyu' },
+  { kana: 'よい', roman: 'yoi' },
+  { kana: 'よなか', roman: 'yonaka' },
+  { kana: 'あけがた', roman: 'akegata' },
+  { kana: 'ひので', roman: 'hinode' },
+  { kana: 'こはる', roman: 'koharu' },
+  { kana: 'まひる', roman: 'mahiru' },
+  { kana: 'ゆうぐれ', roman: 'yugure' },
+  { kana: 'わかつき', roman: 'wakatsuki' },
+  { kana: 'ついたち', roman: 'tsuitachi' },
+  { kana: 'ながつき', roman: 'nagatsuki' },
 
   // 紙・手紙
-  'tegami', // 手紙
-  'fumi', // 文
-  'sumi', // 墨
-  'fude', // 筆
-  'washi', // 和紙
-  'shiori', // 栞
-  'tanzaku', // 短冊
-  'hanshi', // 半紙
-  'makimono', // 巻物
-  'sumibako', // 墨箱
+  { kana: 'てがみ', roman: 'tegami' },
+  { kana: 'ふみ', roman: 'fumi' },
+  { kana: 'すみ', roman: 'sumi' },
+  { kana: 'ふで', roman: 'fude' },
+  { kana: 'わし', roman: 'washi' },
+  { kana: 'しおり', roman: 'shiori' },
+  { kana: 'たんざく', roman: 'tanzaku' },
+  { kana: 'はんし', roman: 'hanshi' },
+  { kana: 'まきもの', roman: 'makimono' },
+  { kana: 'すみばこ', roman: 'sumibako' },
 
   // 記憶・気配
-  'omoide', // 思い出
-  'kioku', // 記憶
-  'nagori', // 名残
-  'kehai', // 気配
-  'hibiki', // 響き
-  'kaori', // 香り
-  'nukumori', // 温もり
-  'seijaku', // 静寂
-  'yoin', // 余韻
-  'omokage', // 面影
-  'kizashi', // 兆し
-  'inishie', // 古
+  { kana: 'おもいで', roman: 'omoide' },
+  { kana: 'きおく', roman: 'kioku' },
+  { kana: 'なごり', roman: 'nagori' },
+  { kana: 'けはい', roman: 'kehai' },
+  { kana: 'ひびき', roman: 'hibiki' },
+  { kana: 'かおり', roman: 'kaori' },
+  { kana: 'ぬくもり', roman: 'nukumori' },
+  { kana: 'せいじゃく', roman: 'seijaku' },
+  { kana: 'よいん', roman: 'yoin' },
+  { kana: 'おもかげ', roman: 'omokage' },
+  { kana: 'きざし', roman: 'kizashi' },
+  { kana: 'いにしえ', roman: 'inishie' },
 
   // 生きもの
-  'hotaru', // 蛍
-  'tsubame', // 燕
-  'suzume', // 雀
-  'semi', // 蝉
-  'koi', // 鯉
-  'tsuru', // 鶴
-  'shika', // 鹿
-  'hibari', // 雲雀
-  'kawasemi', // 翡翠
-  'medaka', // 目高
-  'tonbo', // 蜻蛉
-  'kohrogi', // 蟋蟀
+  { kana: 'ほたる', roman: 'hotaru' },
+  { kana: 'つばめ', roman: 'tsubame' },
+  { kana: 'すずめ', roman: 'suzume' },
+  { kana: 'せみ', roman: 'semi' },
+  { kana: 'こい', roman: 'koi' },
+  { kana: 'つる', roman: 'tsuru' },
+  { kana: 'しか', roman: 'shika' },
+  { kana: 'ひばり', roman: 'hibari' },
+  { kana: 'かわせみ', roman: 'kawasemi' },
+  { kana: 'めだか', roman: 'medaka' },
+  { kana: 'とんぼ', roman: 'tonbo' },
+  { kana: 'こおろぎ', roman: 'koorogi' },
 
   // 音
-  'suzu', // 鈴
-  'kane', // 鐘
-  'furin', // 風鈴
-  'ashioto', // 足音
-  'sasayaki', // 囁き
-  'toiki', // 吐息
-  'kodama', // 木霊
-  'shiosai', // 潮騒
+  { kana: 'すず', roman: 'suzu' },
+  { kana: 'かね', roman: 'kane' },
+  { kana: 'ふうりん', roman: 'furin' },
+  { kana: 'あしおと', roman: 'ashioto' },
+  { kana: 'ささやき', roman: 'sasayaki' },
+  { kana: 'といき', roman: 'toiki' },
+  { kana: 'こだま', roman: 'kodama' },
+  { kana: 'しおさい', roman: 'shiosai' },
 
   // 住まい
-  'engawa', // 縁側
-  'shoji', // 障子
-  'fusuma', // 襖
-  'tatami', // 畳
-  'noren', // 暖簾
-  'sudare', // 簾
-  'tsukubai', // 蹲
-  'andon', // 行灯
-  'rosoku', // 蝋燭
-  'doma', // 土間
-  'nakaniwa', // 中庭
-  'hashira', // 柱
-] as const;
+  { kana: 'えんがわ', roman: 'engawa' },
+  { kana: 'しょうじ', roman: 'shoji' },
+  { kana: 'ふすま', roman: 'fusuma' },
+  { kana: 'たたみ', roman: 'tatami' },
+  { kana: 'のれん', roman: 'noren' },
+  { kana: 'すだれ', roman: 'sudare' },
+  { kana: 'つくばい', roman: 'tsukubai' },
+  { kana: 'あんどん', roman: 'andon' },
+  { kana: 'ろうそく', roman: 'rosoku' },
+  { kana: 'どま', roman: 'doma' },
+  { kana: 'なかにわ', roman: 'nakaniwa' },
+  { kana: 'はしら', roman: 'hashira' },
+];
 
-/// 住所は3語つなぎ。語彙が120前後なので、組み合わせは約170万通り
+/// 住所は3語つなぎ。語彙が130前後なので組み合わせは約200万通り
 export const ADDRESS_WORD_COUNT = 3;
-export const ADDRESS_SEPARATOR = '-';
+/// 区切りは中黒。日本語の並記として自然な記号
+export const ADDRESS_SEPARATOR = '・';
 
-/// 住所として妥当な形か(受け取った文字列を検証する用)
-export const ADDRESS_PATTERN = new RegExp(
-  `^[a-z]{2,12}(${ADDRESS_SEPARATOR}[a-z]{2,12}){${ADDRESS_WORD_COUNT - 1}}$`,
-);
+/// ひらがな・ローマ字のどちらからでも正規表記(かな)を引ける表
+const WORD_LOOKUP = new Map<string, string>();
+for (const word of ADDRESS_WORDS) {
+  WORD_LOOKUP.set(word.kana, word.kana);
+  WORD_LOOKUP.set(word.roman, word.kana);
+}
+
+/// カタカナをひらがなに寄せる
+function toHiragana(text: string): string {
+  return text.replace(/[ァ-ヶ]/g, (char) =>
+    String.fromCharCode(char.charCodeAt(0) - 0x60),
+  );
+}
+
+/**
+ * 入力された住所を正規表記に直す。引けなければ null。
+ *
+ * 相手から聞いて打つものなので、できるだけ寛容にする。
+ * ひらがな・カタカナ・ローマ字を受け、区切りは中黒・ハイフン・空白・読点などを許す。
+ */
+export function normalizeAddress(input: string): string | null {
+  const cleaned = toHiragana(input.trim().toLowerCase())
+    // 全角英数を半角に寄せる
+    .replace(/[Ａ-Ｚａ-ｚ]/g, (char) =>
+      String.fromCharCode(char.charCodeAt(0) - 0xfee0).toLowerCase(),
+    );
+
+  const tokens = cleaned
+    .split(/[・･、,.\-‐-―_/\s]+/)
+    .filter((token) => token.length > 0);
+
+  if (tokens.length !== ADDRESS_WORD_COUNT) return null;
+
+  const words: string[] = [];
+  for (const token of tokens) {
+    const kana = WORD_LOOKUP.get(token);
+    if (kana === undefined) return null;
+    words.push(kana);
+  }
+  return words.join(ADDRESS_SEPARATOR);
+}
+
+/// 正規表記になっているか(既存の住所を作り直すかの判断に使う)
+export function isNormalizedAddress(address: string): boolean {
+  return normalizeAddress(address) === address;
+}
