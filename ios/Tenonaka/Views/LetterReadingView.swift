@@ -131,12 +131,23 @@ struct LetterReadingView: View {
         VStack {
             Spacer()
             VStack(spacing: 7) {
-                Text("手に持っているあいだだけ、続きが現れます")
-                    .font(Mincho.font(13))
-                    .foregroundStyle(Paper.inkSoft)
-                Text("この手紙は、要約できません")
-                    .font(Mincho.font(11))
-                    .foregroundStyle(Paper.inkFaint)
+                // まだ一文字も現れていないときは、やることを伝える。
+                // 途中で止まったときは、止まった理由を伝える
+                Text(
+                    session.revealedCount == 0
+                        ? "手に持つと、文字が現れます"
+                        : "手に持っているあいだだけ、続きが現れます"
+                )
+                .font(Mincho.font(13.5))
+                .foregroundStyle(Paper.inkSoft)
+
+                Text(
+                    session.revealedCount == 0
+                        ? "机に置くと止まります"
+                        : "この手紙は、要約できません"
+                )
+                .font(Mincho.font(11))
+                .foregroundStyle(Paper.inkFaint)
             }
             .padding(.vertical, 16)
             .padding(.horizontal, 26)

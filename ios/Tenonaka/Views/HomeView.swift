@@ -17,42 +17,61 @@ struct HomeView: View {
     @State private var failureText: String?
 
     var body: some View {
-        ZStack {
-            PaperSurface(showsRules: false)
+        GeometryReader { geometry in
+            // 水面を画面のこのあたりに置く。下半分を海にすると、
+            // 砂浜から沖を見ている構図になって余白が空白ではなくなる
+            let seaHeight = geometry.size.height * 0.62
+
+            ZStack {
+                PaperSurface(showsRules: false)
+                    .ignoresSafeArea()
+
+                // 海は画面の下に固定する。内容と一緒にスクロールすると
+                // 水面が上下して落ち着かない
+                VStack {
+                    Spacer()
+                    SeaView(drifting: store.sea.drifting, height: seaHeight)
+                }
                 .ignoresSafeArea()
 
-            ScrollView {
-                VStack(alignment: .leading, spacing: 0) {
-                    title
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 0) {
+                        title
 
-                    actions
-                        .padding(.top, 34)
+                        actions
+                            .padding(.top, 34)
 
-                    if let failureText {
-                        Text(failureText)
-                            .font(Mincho.font(12.5))
-                            .lineSpacing(5)
-                            .foregroundStyle(Paper.ribbon)
-                            .padding(.top, 18)
+                        if let failureText {
+                            Text(failureText)
+                                .font(Mincho.font(12.5))
+                                .lineSpacing(5)
+                                .foregroundStyle(Paper.ribbon)
+                                .padding(.top, 18)
+                        }
+
+                        if !store.received.isEmpty {
+                            receivedSection
+                                .padding(.top, 40)
+                        }
+
+                        if !store.sent.isEmpty {
+                            sentSection
+                                .padding(.top, 38)
+                        }
+
+                        if store.isOffline {
+                            Text("海に繋がっていません")
+                                .font(Mincho.font(11.5))
+                                .foregroundStyle(Paper.ribbon.opacity(0.8))
+                                .frame(maxWidth: .infinity, alignment: .center)
+                                .padding(.top, 30)
+                        }
                     }
-
-                    receivedSection
-                        .padding(.top, 40)
-
-                    sentSection
-                        .padding(.top, 38)
-
-                    if store.isOffline {
-                        Text("海に繋がっていません")
-                            .font(Mincho.font(11.5))
-                            .foregroundStyle(Paper.ribbon.opacity(0.8))
-                            .frame(maxWidth: .infinity, alignment: .center)
-                            .padding(.top, 30)
-                    }
+                    .padding(.horizontal, 32)
+                    .padding(.top, 46)
+                    // 海に文字が沈まないよう、水面より上で終わらせる
+                    .padding(.bottom, seaHeight * 0.5 + 30)
                 }
-                .padding(.horizontal, 32)
-                .padding(.top, 46)
-                .padding(.bottom, 50)
             }
         }
         .task { await store.refresh() }
@@ -113,13 +132,14 @@ struct HomeView: View {
         }
     }
 
-    /// 拾える条件を、断られる前に伝える
+    /// 拾える条件を、断られる前に伝える。
+    /// 海の様子は拾えない時でも見せる。そこに手紙があると分かるほうが流したくなる
     private var pickUpDetail: String {
-        if store.sea.canPickUp <= 0 {
-            return "拾うには、まず一通流す"
-        }
         if store.sea.drifting <= 0 {
             return "いま海に手紙はない"
+        }
+        if store.sea.canPickUp <= 0 {
+            return "海に \(store.sea.drifting)通。拾うには、まず一通流す"
         }
         return "海に \(store.sea.drifting)通 漂っている"
     }
@@ -178,12 +198,7 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 16) {
             sectionTitle("拾った手紙")
 
-            if store.received.isEmpty {
-                Text("まだありません")
-                    .font(Mincho.font(12.5))
-                    .foregroundStyle(Paper.inkFaint)
-            } else {
-                VStack(spacing: 0) {
+            VStack(spacing: 0) {
                     ForEach(store.received) { letter in
                         Button {
                             Task { await open(code: letter.code) }
@@ -201,11 +216,10 @@ struct HomeView: View {
                     }
                 }
 
-                Text("開くたびに、もう一度手に持つ必要があります。")
-                    .font(Mincho.font(11))
-                    .foregroundStyle(Paper.inkFaint)
-                    .padding(.top, 4)
-            }
+            Text("開くたびに、もう一度手に持つ必要があります。")
+                .font(Mincho.font(11))
+                .foregroundStyle(Paper.inkFaint)
+                .padding(.top, 4)
         }
     }
 
@@ -228,18 +242,12 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 16) {
             sectionTitle("流した手紙")
 
-            if store.sent.isEmpty {
-                Text("まだありません")
-                    .font(Mincho.font(12.5))
-                    .foregroundStyle(Paper.inkFaint)
-            } else {
-                VStack(spacing: 0) {
-                    ForEach(store.sent) { letter in
-                        SentLetterRow(letter: letter)
-                        Rectangle()
-                            .fill(Paper.rule.opacity(0.4))
-                            .frame(height: 0.6)
-                    }
+            VStack(spacing: 0) {
+                ForEach(store.sent) { letter in
+                    SentLetterRow(letter: letter)
+                    Rectangle()
+                        .fill(Paper.rule.opacity(0.4))
+                        .frame(height: 0.6)
                 }
             }
         }

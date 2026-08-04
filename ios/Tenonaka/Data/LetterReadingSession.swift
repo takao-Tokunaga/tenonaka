@@ -62,6 +62,10 @@ final class LetterReadingSession: ObservableObject {
     func start() {
         guard ticker == nil else { return }
         tremor.start()
+        // まだ一度も握られていない状態から数えはじめる。
+        // 握ってから離したときだけ案内を出す作りだと、
+        // 開いた直後は何をすればいいか分からないまま白紙が続いてしまう
+        unheldSince = Date()
 
         ticker = Task { @MainActor [weak self] in
             var last = Date()
