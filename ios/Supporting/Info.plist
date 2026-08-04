@@ -22,9 +22,12 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>LSRequiresIPhoneOS</key>
 	<true/>
-	<!-- バックエンドの接続先。ビルド設定 NIOI_API_BASE_URL から流し込む -->
+	<!-- バックエンドの接続先。ビルド設定 TENONAKA_API_BASE_URL から流し込む -->
 	<key>TenonakaAPIBaseURL</key>
 	<string>$(TENONAKA_API_BASE_URL)</string>
+	<!-- 開発中に手元のサーバーへ向けるための接続先。デプロイせずに動作確認するため -->
+	<key>TenonakaLocalAPIBaseURL</key>
+	<string>$(TENONAKA_LOCAL_API_BASE_URL)</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<!-- ハッカソン用: 同一 LAN / localhost のバックエンドに http で繋ぐため -->

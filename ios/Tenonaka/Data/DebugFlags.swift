@@ -19,9 +19,13 @@ enum DebugFlags {
 
     /// 微動の検証画面だけを出す
     static var tremorTest: Bool { env["TREMOR_TEST"] == "1" }
+
+    /// 瓶に入れて流す演出だけを出す(カメラが要らないのでシミュレータで確認できる)
+    static var castAnimation: Bool { env["CAST_ANIM"] == "1" }
     #else
     static var letterReading: Bool { false }
     static var pulseTest: Bool { false }
     static var tremorTest: Bool { false }
+    static var castAnimation: Bool { false }
     #endif
 }

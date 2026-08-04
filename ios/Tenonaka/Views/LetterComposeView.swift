@@ -68,8 +68,8 @@ struct LetterComposeView: View {
                 Task { await send(bpm: bpm) }
             }
         }
-        .sheet(item: $sentLetter) { letter in
-            SentCodeView(letter: letter) { dismiss() }
+        .fullScreenCover(item: $sentLetter) { letter in
+            CastAnimationView(letter: letter) { dismiss() }
         }
     }
 
@@ -138,74 +138,5 @@ struct LetterComposeView: View {
             failureText = error.localizedDescription
         }
         isSending = false
-    }
-}
-
-/// 流したあとの画面。符号は見せない。宛先も相手も無いので、
-/// 伝えることは「海に出た」ことだけ。
-struct SentCodeView: View {
-    let letter: Letter
-    let onClose: () -> Void
-
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        ZStack {
-            PaperSurface(showsRules: false)
-                .ignoresSafeArea()
-
-            VStack(spacing: 24) {
-                Spacer()
-
-                Text("海に流しました")
-                    .font(Mincho.font(19))
-                    .foregroundStyle(Paper.ink)
-
-                if let bpm = letter.senderBpm {
-                    ZStack {
-                        Circle()
-                            .fill(Paper.ribbon.opacity(0.92))
-                            .frame(width: 84, height: 84)
-                        VStack(spacing: 0) {
-                            Text("\(Int(bpm.rounded()))")
-                                .font(Mincho.font(31, bold: true))
-                            Text("拍")
-                                .font(Mincho.font(11))
-                        }
-                        .foregroundStyle(Paper.base)
-                    }
-                    .shadow(color: .black.opacity(0.18), radius: 7, y: 3)
-                }
-
-                VStack(spacing: 7) {
-                    Text("いつか、見知らぬ誰かが拾います")
-                        .font(Mincho.font(13))
-                        .foregroundStyle(Paper.inkSoft)
-                    Text("返ってくるのは、その人が持っていた時間と脈だけです")
-                        .font(Mincho.font(11.5))
-                        .foregroundStyle(Paper.inkFaint)
-                }
-                .multilineTextAlignment(.center)
-
-                Text("あなたも一通、拾えるようになりました")
-                    .font(Mincho.font(12))
-                    .foregroundStyle(Paper.ribbon.opacity(0.85))
-                    .padding(.top, 6)
-
-                Spacer()
-
-                Button {
-                    dismiss()
-                    onClose()
-                } label: {
-                    Text("とじる")
-                        .font(Mincho.font(14))
-                        .foregroundStyle(Paper.inkSoft)
-                }
-                .buttonStyle(.plain)
-                .padding(.bottom, 34)
-            }
-            .padding(.horizontal, 32)
-        }
     }
 }

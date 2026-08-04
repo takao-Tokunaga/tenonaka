@@ -13,10 +13,20 @@ enum AppConfig {
     private static let overrideKey = "apiBaseURL"
     static let fallbackBaseURL = "http://localhost:3100"
 
-    /// ビルド時に埋め込まれた接続先
+    /// ビルド時に埋め込まれた接続先(本番)
     static var bundledBaseURLText: String {
-        let value = Bundle.main.object(forInfoDictionaryKey: "TenonakaAPIBaseURL") as? String
-        guard let value, !value.isEmpty, value.hasPrefix("http") else { return fallbackBaseURL }
+        infoPlistURL(forKey: "TenonakaAPIBaseURL") ?? fallbackBaseURL
+    }
+
+    /// ビルド時に埋め込まれた手元のサーバー。
+    /// デプロイせずに動作確認するための逃げ道。埋め込まれていなければ nil
+    static var localBaseURLText: String? {
+        infoPlistURL(forKey: "TenonakaLocalAPIBaseURL")
+    }
+
+    private static func infoPlistURL(forKey key: String) -> String? {
+        let value = Bundle.main.object(forInfoDictionaryKey: key) as? String
+        guard let value, !value.isEmpty, value.hasPrefix("http") else { return nil }
         return value
     }
 

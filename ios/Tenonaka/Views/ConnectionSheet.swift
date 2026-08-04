@@ -43,21 +43,23 @@ struct ConnectionSheet: View {
                             .stroke(Paper.rule.opacity(0.8), lineWidth: 0.6)
                     }
 
-                Text("実機の場合は、同じ Wi-Fi 上の Mac の IP を指定する。\nビルド時の既定値は \(AppConfig.bundledBaseURLText)")
+                // よく使う2つは打たずに切り替えられるようにする。
+                // 開発中は手元のサーバーに向けて、デプロイを待たずに確認したい
+                HStack(spacing: 10) {
+                    if let local = AppConfig.localBaseURLText {
+                        preset("手元のサーバー", url: local)
+                    }
+                    preset("本番", url: AppConfig.bundledBaseURLText)
+                }
+
+                Text("手元のサーバーに向けると、デプロイを待たずに確認できる。\nビルド時の既定値は \(AppConfig.bundledBaseURLText)")
                     .font(Mincho.font(12))
                     .lineSpacing(5)
                     .foregroundStyle(Paper.inkFaint)
 
                 HStack(spacing: 18) {
                     Button {
-                        AppConfig.setAPIBaseURL(text)
-                        Task {
-                            isChecking = true
-                            result = nil
-                            let reachable = await store.reload()
-                            isChecking = false
-                            result = reachable ? "つながった" : "つながらない"
-                        }
+                        connect()
                     } label: {
                         Text("つなぐ")
                             .font(Mincho.font(14, bold: true))
@@ -98,6 +100,44 @@ struct ConnectionSheet: View {
             }
             .padding(.horizontal, 28)
             .padding(.top, 26)
+        }
+    }
+
+    /// 接続先の候補。押すと欄に入れて、そのまま繋ぐ
+    private func preset(_ label: String, url: String) -> some View {
+        let isCurrent = text.trimmed == url
+
+        return Button {
+            text = url
+            connect()
+        } label: {
+            Text(label)
+                .font(Mincho.font(13))
+                .foregroundStyle(isCurrent ? Paper.base : Paper.inkSoft)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 8)
+                .background {
+                    Capsule()
+                        .fill(isCurrent ? Paper.ink.opacity(0.85) : Color.clear)
+                        .overlay {
+                            Capsule().stroke(
+                                isCurrent ? Color.clear : Paper.rule.opacity(0.8),
+                                lineWidth: 0.6
+                            )
+                        }
+                }
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func connect() {
+        AppConfig.setAPIBaseURL(text)
+        Task {
+            isChecking = true
+            result = nil
+            let reachable = await store.reload()
+            isChecking = false
+            result = reachable ? "つながった" : "つながらない"
         }
     }
 }
