@@ -164,6 +164,7 @@ xcrun devicectl device install app --device <DEVICE_ID> <APP_PATH>
 | 実行 | App Runner `tenonaka-api` (0.5 vCPU / 1GB) |
 | DB | RDS PostgreSQL 18.3 `tenonaka-db`(非公開・単一AZ) |
 | 経路 | App Runner → VPC コネクタ → RDS。SG 参照で 5432 のみ許可 |
+| 接続情報 | SSM パラメータストア `/tenonaka/DATABASE_URL` (SecureString) |
 | リージョン | ap-northeast-1 |
 
 **App Runner を選んだ理由は HTTPS。** AWS でドメインを持たずに有効な証明書つき
@@ -186,6 +187,34 @@ OCI image index (マニフェストリスト) を作り、**App Runner が pull 
 `--platform linux/amd64` も必須(App Runner は x86_64、開発機は arm64)。
 
 起動時に `prisma migrate deploy` が走る。
+
+### DB の接続情報
+
+**App Runner の環境変数には置かない。** 環境変数は `describe-service` で誰でも読めるため、
+共有アカウントではパスワードが平文で露出する。
+
+SSM パラメータストアの SecureString に置き、`RuntimeEnvironmentSecrets` から参照している。
+そのためにインスタンスロール(信頼先 `tasks.apprunner.amazonaws.com`)が必要で、
+ECR プル用のロールとは別物である。
+
+権限は [`scripts/deploy/instance-role-policy.json`](scripts/deploy/instance-role-policy.json) の通り
+最小限に絞っている。
+
+- `ssm:GetParameter` は `/tenonaka/*` のみ(他プロジェクトのパラメータは読めない)
+- `kms:Decrypt` は `kms:ViaService = ssm.ap-northeast-1.amazonaws.com` の条件付き
+  (SSM 経由以外では復号できない)
+
+パスワードを入れ替えるときは、**先に SSM を更新してから** RDS を変更する。
+逆順だと接続できない時間が長くなる。
+
+```bash
+NEW_PASSWORD=$(openssl rand -base64 24 | tr -d '/+=@" ' | cut -c1-24)
+aws ssm put-parameter --name /tenonaka/DATABASE_URL --type SecureString --overwrite \
+  --value "postgresql://tenonaka:${NEW_PASSWORD}@<endpoint>:5432/tenonaka?schema=public"
+aws rds modify-db-instance --db-instance-identifier tenonaka-db \
+  --master-user-password "$NEW_PASSWORD" --apply-immediately
+aws apprunner start-deployment --service-arn "$SERVICE_ARN"
+```
 
 ### 構築時に踏んだ落とし穴
 

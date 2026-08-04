@@ -1,0 +1,20 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadTenonakaParameters",
+      "Effect": "Allow",
+      "Action": ["ssm:GetParameter", "ssm:GetParameters"],
+      "Resource": "arn:aws:ssm:ap-northeast-1:ACCOUNT_ID:parameter/tenonaka/*"
+    },
+    {
+      "Sid": "DecryptOnlyViaSsm",
+      "Effect": "Allow",
+      "Action": "kms:Decrypt",
+      "Resource": "*",
+      "Condition": {
+        "StringEquals": { "kms:ViaService": "ssm.ap-northeast-1.amazonaws.com" }
+      }
+    }
+  ]
+}
