@@ -24,6 +24,11 @@ model Letter {
   senderUserId  String
   sentAt        DateTime @default(now())
 
+  /// 最初に開いた端末。手渡しは一人にしか渡せないので、以後は他から読めない。
+  /// 符号を総当たりしても、当たった手紙のほとんどが既に受け取られ済みになる。
+  claimedByUserId String?
+  claimedAt       DateTime?
+
   /// 読まれた記録。まだ読まれていなければ null
   readHeldSeconds  Float?
   readReleaseCount Int?

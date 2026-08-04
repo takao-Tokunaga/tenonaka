@@ -2,6 +2,8 @@ import Foundation
 
 enum LetterError: LocalizedError {
     case notFound
+    /// サーバーが返した理由をそのまま見せる(受け取り済みなど)
+    case rejected(String)
     case badResponse(status: Int)
     case decoding
     case offline
@@ -9,11 +11,28 @@ enum LetterError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .notFound: return "その符号の手紙はありません"
+        case .rejected(let reason): return reason
         case .badResponse(let status): return "サーバーからの応答が不正です (\(status))"
         case .decoding: return "サーバーからの応答を解釈できませんでした"
         case .offline: return "サーバーに繋がりません"
         }
     }
+}
+
+/// NestJS の例外フィルタが返す形。message は文字列か文字列の配列。
+private struct ServerErrorBody: Decodable {
+    let message: [String]
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        if let single = try? container.decode(String.self, forKey: .message) {
+            message = [single]
+        } else {
+            message = (try? container.decode([String].self, forKey: .message)) ?? []
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey { case message }
 }
 
 /// 手紙のやりとり。接続先は実行時に差し替えられるよう毎回 AppConfig から読む。
@@ -110,6 +129,11 @@ struct LetterRepository {
         guard let http = response as? HTTPURLResponse else { throw LetterError.decoding }
         if http.statusCode == 404 { throw LetterError.notFound }
         guard (200..<300).contains(http.statusCode) else {
+            // 受け取り済みなどはサーバーの文言をそのまま読み手に見せたい
+            if let body = try? JSONDecoder().decode(ServerErrorBody.self, from: data),
+               let reason = body.message.first {
+                throw LetterError.rejected(reason)
+            }
             throw LetterError.badResponse(status: http.statusCode)
         }
         return data
@@ -134,6 +158,7 @@ private struct LetterDTO: Decodable {
     let recipientName: String?
     let senderBpm: Double?
     let sentAt: String
+    let claimedAt: String?
     let receipt: Receipt?
 
     func toDomain() -> Letter {
@@ -144,6 +169,7 @@ private struct LetterDTO: Decodable {
             recipientName: recipientName,
             senderBpm: senderBpm,
             sentAt: ISO8601.date(from: sentAt) ?? Date(),
+            claimedAt: claimedAt.flatMap(ISO8601.date(from:)),
             receipt: receipt.map {
                 ReadReceipt(
                     heldSeconds: $0.heldSeconds,

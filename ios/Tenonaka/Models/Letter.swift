@@ -13,6 +13,8 @@ struct Letter: Identifiable, Hashable, Sendable {
     /// 封をした瞬間の脈
     var senderBpm: Double?
     var sentAt: Date
+    /// 受け取られた時刻。読み終えたかとは別の状態
+    var claimedAt: Date?
     /// 読まれ方の記録。まだ読まれていなければ nil
     var receipt: ReadReceipt?
 

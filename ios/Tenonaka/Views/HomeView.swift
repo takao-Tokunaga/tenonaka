@@ -184,8 +184,13 @@ struct SentLetterRow: View {
                             .foregroundStyle(Paper.ribbon.opacity(0.8))
                     }
                 }
+            } else if letter.claimedAt != nil {
+                // 受け取られてはいるが、まだ読み終えていない
+                Text("受け取られました")
+                    .font(Mincho.font(12))
+                    .foregroundStyle(Paper.inkSoft)
             } else {
-                Text("まだ読まれていません")
+                Text("まだ受け取られていません")
                     .font(Mincho.font(12))
                     .foregroundStyle(Paper.inkFaint)
             }
