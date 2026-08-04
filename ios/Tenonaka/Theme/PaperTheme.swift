@@ -49,14 +49,27 @@ enum Mincho {
 /// 背景に固定間隔の罫線を敷くと文字と噛み合わず、線が字に重なってしまう。
 enum BodyText {
     static let size: CGFloat = 17
-    /// 行間。字の詰まりはこれで決まる
-    static let spacing: CGFloat = 15
 
-    /// フォント自体の行の高さ。実測値を使う(明朝で size の1.5倍前後)
-    static var lineHeight: CGFloat { Mincho.uiFont(size).lineHeight }
+    /// 行送り。罫線の間隔もこれ。ここを起点にして行間を逆算する
+    static let pitch: CGFloat = 40
 
-    /// 一行が占める高さ。罫線の間隔もこれに合わせる
-    static var pitch: CGFloat { lineHeight + spacing }
+    /**
+     UIKit が実際に組む一行の高さ。
+
+     `UIFont.lineHeight` も `NSString.size` も、明朝では 1em(17pt)を返す。
+     しかし実際に組み上がった行を画面から測ると 25.3pt だった
+     (行送り 40.3pt = 25.3 + 行間 15)。この差の分だけ罫線がずれていた。
+
+     API から取れないので実測した比を使う。フォントを変えたら測り直すこと。
+     */
+    private static let layoutLineHeightRatio: CGFloat = 25.3 / 17
+    static var layoutLineHeight: CGFloat { size * layoutLineHeightRatio }
+
+    /// Text / TextEditor に渡す行間。行送りから組み上がりの行高を引いたもの
+    static var spacing: CGFloat { pitch - layoutLineHeight }
+
+    /// 行の上端からベースラインまで。罫線を引く基準はここ
+    static var ascender: CGFloat { Mincho.uiFont(size).ascender }
 
     static var font: Font { Mincho.font(size) }
 }
@@ -65,8 +78,13 @@ enum BodyText {
 ///
 /// 本文と同じ器の中に敷くので、器の原点が共通になり位置がずれない。
 struct BodyRules: View {
-    /// 最初の線をどこに引くか。字の下に来るよう、行の高さから少し上げる
-    private var firstLine: CGFloat { BodyText.lineHeight - 3 }
+    /// ベースラインから線までの間。0 だと字の下端に触れて「被って」見えるので、
+    /// かなの下に伸びる部分をよけられるだけ空ける
+    private let clearance: CGFloat = 4
+
+    /// 最初の線をどこに引くか。
+    /// 一行目のベースラインは行の上端から ascender の位置にあるので、そこを基準にする
+    private var firstLine: CGFloat { BodyText.ascender + clearance }
 
     var body: some View {
         GeometryReader { geometry in
@@ -78,7 +96,7 @@ struct BodyRules: View {
                     y += BodyText.pitch
                 }
             }
-            .stroke(Paper.rule.opacity(0.34), lineWidth: 0.5)
+            .stroke(Paper.rule.opacity(0.30), lineWidth: 0.5)
         }
         .allowsHitTesting(false)
     }

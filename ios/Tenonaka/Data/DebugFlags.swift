@@ -26,11 +26,15 @@ enum DebugFlags {
     /// 握らなくても文字を現す。シミュレータには加速度センサーが無いので、
     /// 組み(罫線と文字の行送り)を確かめるために使う
     static var revealWithoutHolding: Bool { env["REVEAL_ALL"] == "1" }
+
+    /// 書く画面を、文字を入れた状態で開く。罫線との噛み合わせを見るため
+    static var composeTest: Bool { env["COMPOSE"] == "1" }
     #else
     static var letterReading: Bool { false }
     static var pulseTest: Bool { false }
     static var tremorTest: Bool { false }
     static var castAnimation: Bool { false }
     static var revealWithoutHolding: Bool { false }
+    static var composeTest: Bool { false }
     #endif
 }

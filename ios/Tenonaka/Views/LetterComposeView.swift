@@ -8,7 +8,10 @@ struct LetterComposeView: View {
     @EnvironmentObject private var store: LetterStore
     @Environment(\.dismiss) private var dismiss
 
-    @State private var body_ = ""
+    // 検証時は文字を入れた状態で開く(罫線との噛み合わせを見るため)
+    @State private var body_ = DebugFlags.composeTest
+        ? "元気にしていますか。こちらは変わりありません。母の膝は相変わらずで、朝の階段だけは手すりを使うようになりました。それでも庭のことは自分でやると言って聞きません。"
+        : ""
     @State private var isSealing = false
     @State private var isSending = false
     @State private var sentLetter: Letter?
