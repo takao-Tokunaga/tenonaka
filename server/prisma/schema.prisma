@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+/// 手紙。
+///
+/// 送るときに書いた人の脈が刻まれ(生きた身体が送った証)、
+/// 読まれたときに「生きた手が何秒握っていたか」が返る。
+/// 内容への返信は持たない。返るのは費やされた時間だけ。
+model Letter {
+  id            String   @id @default(uuid())
+  /// 受け取る人に口で伝える短い符号
+  code          String   @unique
+  body          String
+  senderName    String?
+  recipientName String?
+  /// 封をした瞬間の脈
+  senderBpm     Float?
+  senderUserId  String
+  sentAt        DateTime @default(now())
+
+  /// 読まれた記録。まだ読まれていなければ null
+  readHeldSeconds  Float?
+  readReleaseCount Int?
+  readCompleted    Boolean?
+  readAt           DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([senderUserId, sentAt])
+}

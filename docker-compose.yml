@@ -1,0 +1,22 @@
+services:
+  db:
+    image: postgres:16-alpine
+    container_name: tenonaka-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: tenonaka
+      POSTGRES_PASSWORD: tenonaka
+      POSTGRES_DB: tenonaka
+    # ローカルに別の PostgreSQL が動いていても衝突しないよう 5433 を使う
+    ports:
+      - "5433:5432"
+    volumes:
+      - tenonaka-db-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U tenonaka -d tenonaka"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+volumes:
+  tenonaka-db-data:

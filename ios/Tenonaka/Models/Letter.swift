@@ -1,0 +1,111 @@
+import Foundation
+
+/// 手紙。
+/// 送るときに書いた人の脈が刻まれ、読まれたときに「生きた手が何秒持っていたか」が返る。
+struct Letter: Identifiable, Hashable, Sendable {
+    /// 受け取る人に口で伝える短い符号。これが手紙の識別子でもある
+    var code: String
+    var body: String
+    /// 署名(差出人)
+    var senderName: String?
+    /// 宛名(受取人)
+    var recipientName: String?
+    /// 封をした瞬間の脈
+    var senderBpm: Double?
+    var sentAt: Date
+    /// 読まれ方の記録。まだ読まれていなければ nil
+    var receipt: ReadReceipt?
+
+    var id: String { code }
+
+    var characters: [Character] { Array(body) }
+
+    /// 手紙の日付。紙と明朝の世界に合わせて漢数字で組む
+    var dateText: String {
+        let parts = Calendar.current.dateComponents([.year, .month, .day], from: sentAt)
+        guard let year = parts.year, let month = parts.month, let day = parts.day else {
+            return ""
+        }
+        return "\(KanjiNumber.year(year))年\(KanjiNumber.of(month))月\(KanjiNumber.of(day))日"
+    }
+}
+
+/// 読まれ方の記録。内容への返信ではなく、費やされた時間だけが返る。
+struct ReadReceipt: Hashable, Sendable {
+    /// 生きた手が握っていた合計秒数
+    var heldSeconds: Double
+    /// 途中で置かれた回数
+    var releaseCount: Int
+    /// 最後まで現れたか
+    var completed: Bool
+    var readAt: Date
+
+    var heldText: String {
+        let total = Int(heldSeconds.rounded())
+        let minutes = total / 60
+        let seconds = total % 60
+        if minutes > 0 { return "\(minutes)分\(seconds)秒" }
+        return "\(seconds)秒"
+    }
+}
+
+/// 漢数字。日付を「二〇二六年八月四日」と組むためだけの最小実装。
+enum KanjiNumber {
+    private static let digits = ["〇", "一", "二", "三", "四", "五", "六", "七", "八", "九"]
+
+    /// 年は桁ごとに並べる(二〇二六)
+    static func year(_ value: Int) -> String {
+        String(value).compactMap { character in
+            character.wholeNumberValue.map { digits[$0] }
+        }.joined()
+    }
+
+    /// 月日は数として読む(十四、二十四)
+    static func of(_ value: Int) -> String {
+        switch value {
+        case 0..<10: return digits[value]
+        case 10: return "十"
+        case 11..<20: return "十" + digits[value - 10]
+        default:
+            let tens = value / 10
+            let ones = value % 10
+            return digits[tens] + "十" + (ones == 0 ? "" : digits[ones])
+        }
+    }
+}
+
+// MARK: - 空文字の扱い
+
+extension String {
+    var trimmed: String { trimmingCharacters(in: .whitespacesAndNewlines) }
+
+    /// 空文字は nil と同じ扱いにする
+    var nilIfBlank: String? { trimmed.isEmpty ? nil : self }
+}
+
+extension Letter {
+    /// 動作確認用。サーバーに繋がらないときでも読む画面を見られるようにしている。
+    static let sample = Letter(
+        code: "AOI",
+        body: """
+        元気にしていますか。
+
+        こちらは変わりありません。母の膝は相変わらずで、朝の階段だけは手すりを使うようになりました。それでも庭のことは自分でやると言って聞きません。
+
+        去年あなたが植えていった木が、今年は花をつけました。写真を撮ったのですが、どうにも本物のようには写らないので、送るのはやめました。
+
+        伝えたいことがあって書きはじめたのに、こうしていると、どうでもいいことばかり並べてしまいます。本当のことを書くのが、少し怖いのだと思います。
+
+        先週、病院で検査を受けました。結果はまだ出ていません。何でもないと思います。ただ、何でもなかったとしても、一度ちゃんと言っておきたくなりました。
+
+        あのとき、あなたを引き止めなかったのは、行かせたかったからです。寂しくなかったわけではありません。
+
+        返事はいりません。読んでくれただけで、じゅうぶんです。
+        """,
+        senderName: "母より",
+        recipientName: "あなたへ",
+        senderBpm: 74,
+        sentAt: Date(),
+        receipt: nil
+    )
+}

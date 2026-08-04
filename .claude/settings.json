@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx prisma *)",
+      "Bash(npx nest *)",
+      "Bash(npm install *)",
+      "Bash(npm run *)",
+      "Bash(xcodebuild *)",
+      "Bash(xcrun devicectl *)",
+      "Bash(xcrun simctl *)",
+      "Bash(node /Users/takao/dev/tenonaka/server/dist/main.js)",
+      "Bash(pkill -f \"dist/main.js\")"
+    ]
+  }
+}
