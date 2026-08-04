@@ -9,7 +9,6 @@ struct HomeView: View {
     @EnvironmentObject private var store: LetterStore
 
     @State private var isComposing = false
-    @State private var isReceiving = false
     @State private var isConnectionSheetOpen = false
 
     /// 棚から開いた手紙。取り直してから読む画面に入る
@@ -59,9 +58,6 @@ struct HomeView: View {
         .task { await store.refresh() }
         .fullScreenCover(isPresented: $isComposing) {
             LetterComposeView()
-        }
-        .fullScreenCover(isPresented: $isReceiving) {
-            ReceiveLetterView()
         }
         .fullScreenCover(item: $openedLetter) { letter in
             LetterReadingView(letter: letter) { receipt in
@@ -152,13 +148,8 @@ struct HomeView: View {
     }
 
     private var actions: some View {
-        VStack(spacing: 14) {
-            action("手紙を書く", detail: "書いて、脈で封をして送る") {
-                isComposing = true
-            }
-            action("符号で受け取る", detail: "教わった符号を入れる") {
-                isReceiving = true
-            }
+        action("手紙を書く", detail: "書いて、脈で封をして送る") {
+            isComposing = true
         }
     }
 
