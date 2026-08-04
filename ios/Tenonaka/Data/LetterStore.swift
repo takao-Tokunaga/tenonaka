@@ -57,18 +57,8 @@ final class LetterStore: ObservableObject {
     }
 
     /// 海に流す。脈が無いと流せない
-    func cast(
-        body: String,
-        senderName: String?,
-        recipientName: String?,
-        bpm: Double
-    ) async throws -> Letter {
-        let letter = try await repository.cast(
-            body: body,
-            senderName: senderName,
-            recipientName: recipientName,
-            bpm: bpm
-        )
+    func cast(body: String, bpm: Double) async throws -> Letter {
+        let letter = try await repository.cast(body: body, bpm: bpm)
         isOffline = false
         sent.insert(letter, at: 0)
         await refreshSea()

@@ -51,18 +51,12 @@ struct LetterRepository {
 
     /// 海に流す。脈を渡さないと流せない。
     /// ここがこのアプリの関門なので、引数から外せないようにしてある。
-    func cast(
-        body: String,
-        senderName: String?,
-        recipientName: String?,
-        bpm: Double
-    ) async throws -> Letter {
-        var payload: [String: Any] = ["body": body, "senderBpm": bpm]
-        if let senderName = senderName?.nilIfBlank { payload["senderName"] = senderName }
-        if let recipientName = recipientName?.nilIfBlank {
-            payload["recipientName"] = recipientName
-        }
-        let data = try await send(path: "letters", method: "POST", payload: payload)
+    func cast(body: String, bpm: Double) async throws -> Letter {
+        let data = try await send(
+            path: "letters",
+            method: "POST",
+            payload: ["body": body, "senderBpm": bpm]
+        )
         return try decodeLetter(data)
     }
 

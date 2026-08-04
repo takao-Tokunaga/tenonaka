@@ -1,12 +1,13 @@
 import SwiftUI
 
-/// 手紙を書く画面。書き終えたら脈で封をして送る。
+/// 手紙を書く画面。書き終えたら脈で封をして海に流す。
+///
+/// 宛名も署名も持たない。宛先の無い海に流すので宛名は要らず、
+/// 誰が書いたかを名乗らないことがこの海の匿名性そのものである。
 struct LetterComposeView: View {
     @EnvironmentObject private var store: LetterStore
     @Environment(\.dismiss) private var dismiss
 
-    @State private var recipientName = ""
-    @State private var senderName = ""
     @State private var body_ = ""
     @State private var isSealing = false
     @State private var isSending = false
@@ -28,8 +29,6 @@ struct LetterComposeView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
-                        field("宛名", placeholder: "だれかへ", text: $recipientName)
-
                         ZStack(alignment: .topLeading) {
                             if body_.isEmpty {
                                 Text("見知らぬ誰かに宛てて、要約されたくないことを。")
@@ -47,10 +46,8 @@ struct LetterComposeView: View {
                                 .background(Color.clear)
                                 .tint(Paper.ribbon)
                                 .focused($isBodyFocused)
-                                .frame(minHeight: 260)
+                                .frame(minHeight: 380)
                         }
-
-                        field("署名", placeholder: "誰から", text: $senderName)
 
                         if let failureText {
                             Text(failureText)
@@ -104,35 +101,11 @@ struct LetterComposeView: View {
         .padding(.bottom, 18)
     }
 
-    private func field(_ label: String, placeholder: String, text: Binding<String>) -> some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text(label)
-                .font(Mincho.font(11.5))
-                .kerning(1.5)
-                .foregroundStyle(Paper.inkFaint)
-            TextField(placeholder, text: text)
-                .font(Mincho.font(16))
-                .foregroundStyle(Paper.ink)
-                .tint(Paper.ribbon)
-                .padding(.bottom, 7)
-                .overlay(alignment: .bottom) {
-                    Rectangle()
-                        .fill(Paper.rule.opacity(0.7))
-                        .frame(height: 0.6)
-                }
-        }
-    }
-
     private func send(bpm: Double) async {
         isSending = true
         failureText = nil
         do {
-            let letter = try await store.cast(
-                body: body_,
-                senderName: senderName.nilIfBlank,
-                recipientName: recipientName.nilIfBlank,
-                bpm: bpm
-            )
+            let letter = try await store.cast(body: body_, bpm: bpm)
             sentLetter = letter
         } catch {
             failureText = error.localizedDescription
