@@ -43,6 +43,47 @@ enum Mincho {
     }
 }
 
+/// 本文の組み。
+///
+/// 罫線と文字を同じ律で並べるため、行送りをここ一箇所で決める。
+/// 背景に固定間隔の罫線を敷くと文字と噛み合わず、線が字に重なってしまう。
+enum BodyText {
+    static let size: CGFloat = 17
+    /// 行間。字の詰まりはこれで決まる
+    static let spacing: CGFloat = 15
+
+    /// フォント自体の行の高さ。実測値を使う(明朝で size の1.5倍前後)
+    static var lineHeight: CGFloat { Mincho.uiFont(size).lineHeight }
+
+    /// 一行が占める高さ。罫線の間隔もこれに合わせる
+    static var pitch: CGFloat { lineHeight + spacing }
+
+    static var font: Font { Mincho.font(size) }
+}
+
+/// 本文の行に合わせて引く罫線。
+///
+/// 本文と同じ器の中に敷くので、器の原点が共通になり位置がずれない。
+struct BodyRules: View {
+    /// 最初の線をどこに引くか。字の下に来るよう、行の高さから少し上げる
+    private var firstLine: CGFloat { BodyText.lineHeight - 3 }
+
+    var body: some View {
+        GeometryReader { geometry in
+            Path { path in
+                var y = firstLine
+                while y < geometry.size.height {
+                    path.move(to: CGPoint(x: 0, y: y))
+                    path.addLine(to: CGPoint(x: geometry.size.width, y: y))
+                    y += BodyText.pitch
+                }
+            }
+            .stroke(Paper.rule.opacity(0.34), lineWidth: 0.5)
+        }
+        .allowsHitTesting(false)
+    }
+}
+
 /// 紙の粒子。単色の矩形だと「画面」に見えてしまうので、
 /// 起動時に一度だけノイズ画像を作ってタイル敷きしている。
 enum PaperGrain {

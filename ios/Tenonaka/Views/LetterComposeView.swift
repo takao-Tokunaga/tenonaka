@@ -21,7 +21,8 @@ struct LetterComposeView: View {
 
     var body: some View {
         ZStack {
-            PaperSurface(lineSpacing: 36)
+            // 罫線は背景に敷かない。本文と同じ器の中で引いて行を揃える
+            PaperSurface(showsRules: false)
                 .ignoresSafeArea()
 
             VStack(spacing: 0) {
@@ -30,17 +31,22 @@ struct LetterComposeView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
                         ZStack(alignment: .topLeading) {
+                            // TextEditor は内側に余白を持つので、罫線もその分ずらす
+                            BodyRules()
+                                .padding(.top, 8)
+                                .padding(.horizontal, 5)
+
                             if body_.isEmpty {
                                 Text("見知らぬ誰かに宛てて、要約されたくないことを。")
-                                    .font(Mincho.font(17))
+                                    .font(BodyText.font)
                                     .foregroundStyle(Paper.inkFaint.opacity(0.7))
                                     .padding(.top, 8)
                                     .padding(.leading, 5)
                                     .allowsHitTesting(false)
                             }
                             TextEditor(text: $body_)
-                                .font(Mincho.font(17))
-                                .lineSpacing(17)
+                                .font(BodyText.font)
+                                .lineSpacing(BodyText.spacing)
                                 .foregroundStyle(Paper.ink)
                                 .scrollContentBackground(.hidden)
                                 .background(Color.clear)

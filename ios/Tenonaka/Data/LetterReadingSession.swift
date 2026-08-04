@@ -77,7 +77,8 @@ final class LetterReadingSession: ObservableObject {
                 let elapsed = now.timeIntervalSince(last)
                 last = now
 
-                let held = self.tremor.isHeld
+                // 検証時は握らなくても進める(シミュレータに加速度センサーが無いため)
+                let held = self.tremor.isHeld || DebugFlags.revealWithoutHolding
                 if held != self.isHeld {
                     // 握っていた状態から離れたときだけ数える
                     if !held { self.releaseCount += 1 }

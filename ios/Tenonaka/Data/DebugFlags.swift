@@ -22,10 +22,15 @@ enum DebugFlags {
 
     /// 瓶に入れて流す演出だけを出す(カメラが要らないのでシミュレータで確認できる)
     static var castAnimation: Bool { env["CAST_ANIM"] == "1" }
+
+    /// 握らなくても文字を現す。シミュレータには加速度センサーが無いので、
+    /// 組み(罫線と文字の行送り)を確かめるために使う
+    static var revealWithoutHolding: Bool { env["REVEAL_ALL"] == "1" }
     #else
     static var letterReading: Bool { false }
     static var pulseTest: Bool { false }
     static var tremorTest: Bool { false }
     static var castAnimation: Bool { false }
+    static var revealWithoutHolding: Bool { false }
     #endif
 }

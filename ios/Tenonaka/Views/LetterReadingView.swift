@@ -22,7 +22,8 @@ struct LetterReadingView: View {
 
     var body: some View {
         ZStack {
-            PaperSurface(lineSpacing: 36)
+            // 罫線は背景に敷かない。本文と同じ器の中で引いて行を揃える
+            PaperSurface(showsRules: false)
                 .ignoresSafeArea()
 
             ScrollViewReader { proxy in
@@ -31,12 +32,17 @@ struct LetterReadingView: View {
                         header
 
                         Text(session.revealedText)
-                            .font(Mincho.font(17))
-                            .lineSpacing(17)
+                            .font(BodyText.font)
+                            .lineSpacing(BodyText.spacing)
                             .foregroundStyle(Paper.ink)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            // 現れた最後の一文字にだけ、まだ乾いていない滲みを置く
-                            .overlay(alignment: .bottomTrailing) { EmptyView() }
+                            // 文字が現れる前も便箋に見えるよう、罫線の下限を確保する
+                            .frame(
+                                maxWidth: .infinity,
+                                minHeight: BodyText.pitch * 14,
+                                alignment: .topLeading
+                            )
+                            // 罫線は本文の後ろに、同じ行送りで敷く
+                            .background(alignment: .topLeading) { BodyRules() }
 
                         if endingStage >= 1 {
                             closing
