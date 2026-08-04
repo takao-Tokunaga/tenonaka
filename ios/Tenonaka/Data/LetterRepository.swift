@@ -83,6 +83,15 @@ struct LetterRepository {
         return dtos.map { $0.toDomain() }
     }
 
+    /// 受け取った手紙の控え。本文は含まれない
+    func listReceived() async throws -> [ReceivedLetter] {
+        let data = try await send(path: "letters/received", method: "GET")
+        guard let dtos = try? JSONDecoder().decode([ReceivedLetterDTO].self, from: data) else {
+            throw LetterError.decoding
+        }
+        return dtos.map { $0.toDomain() }
+    }
+
     /// 読まれ方を返す。内容への返信は含まない。
     func submitReceipt(code: String, receipt: ReadReceipt) async throws {
         _ = try await send(
@@ -145,6 +154,7 @@ struct LetterRepository {
 /// 日付は文字列で受けて自分で変換する。
 /// サーバーは小数秒つきの ISO8601 を返すが、JSONDecoder の .iso8601 は小数秒を扱えない。
 private struct LetterDTO: Decodable {
+    // 受け取った手紙の控えでも同じ形なので共有する
     struct Receipt: Decodable {
         let heldSeconds: Double
         let releaseCount: Int
@@ -170,6 +180,34 @@ private struct LetterDTO: Decodable {
             senderBpm: senderBpm,
             sentAt: ISO8601.date(from: sentAt) ?? Date(),
             claimedAt: claimedAt.flatMap(ISO8601.date(from:)),
+            receipt: receipt.map {
+                ReadReceipt(
+                    heldSeconds: $0.heldSeconds,
+                    releaseCount: $0.releaseCount,
+                    completed: $0.completed,
+                    readAt: ISO8601.date(from: $0.readAt) ?? Date()
+                )
+            }
+        )
+    }
+}
+
+/// 受け取った手紙の控え。本文が無いのが正しい形。
+private struct ReceivedLetterDTO: Decodable {
+    let code: String
+    let senderName: String?
+    let senderBpm: Double?
+    let sentAt: String
+    let claimedAt: String?
+    let receipt: LetterDTO.Receipt?
+
+    func toDomain() -> ReceivedLetter {
+        ReceivedLetter(
+            code: code,
+            senderName: senderName,
+            sentAt: ISO8601.date(from: sentAt) ?? Date(),
+            claimedAt: claimedAt.flatMap(ISO8601.date(from:)),
+            senderBpm: senderBpm,
             receipt: receipt.map {
                 ReadReceipt(
                     heldSeconds: $0.heldSeconds,

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ConflictException,
   ForbiddenException,
   Injectable,
@@ -38,6 +39,9 @@ const SYLLABLES = [
 
 /// 5音節 = 10文字。58音節なので 58^5 で約6億5000万通り
 const CODE_SYLLABLES = 5;
+
+/// /letters/:code と衝突する経路名。指定符号として使わせない
+const RESERVED_CODES = new Set(['SENT', 'RECEIVED', 'HEALTH']);
 
 /**
  * 符号は秘密として機能するので、暗号論的に安全な乱数を使う。
@@ -96,6 +100,9 @@ export class LettersService {
     // 符号を指定された場合は引き直さず、埋まっていればそのまま失敗させる
     if (dto.code) {
       const code = dto.code.toUpperCase();
+      if (RESERVED_CODES.has(code)) {
+        throw new BadRequestException(`符号 ${code} は使えません`);
+      }
       const existing = await this.prisma.letter.findUnique({ where: { code } });
       if (existing) {
         throw new ConflictException(`符号 ${code} は既に使われています`);
@@ -180,6 +187,38 @@ export class LettersService {
       take: 50,
     });
     return letters.map((letter) => this.toSenderResponse(letter));
+  }
+
+  /**
+   * 自分が受け取った手紙の一覧。
+   *
+   * **本文は返さない。** 読み直すときもサーバーから取り直させ、
+   * 握らないと読めないという機構を通させるため。
+   * 一覧は本文の保管場所ではなく、符号の保管場所である。
+   */
+  async listReceived(userId: string) {
+    const letters = await this.prisma.letter.findMany({
+      where: { claimedByUserId: userId },
+      orderBy: { claimedAt: 'desc' },
+      take: 50,
+    });
+    return letters.map((letter) => ({
+      code: letter.code,
+      senderName: letter.senderName,
+      recipientName: letter.recipientName,
+      senderBpm: letter.senderBpm,
+      sentAt: letter.sentAt.toISOString(),
+      claimedAt: letter.claimedAt?.toISOString() ?? null,
+      receipt:
+        letter.readAt === null
+          ? null
+          : {
+              heldSeconds: letter.readHeldSeconds ?? 0,
+              releaseCount: letter.readReleaseCount ?? 0,
+              completed: letter.readCompleted ?? false,
+              readAt: letter.readAt.toISOString(),
+            },
+    }));
   }
 
   /**

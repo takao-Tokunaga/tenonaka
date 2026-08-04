@@ -48,7 +48,14 @@ export class LettersController {
     return this.letters.listSent(this.requireUserId(userId));
   }
 
+  /// 自分が受け取った手紙の一覧。本文は含まない(読むには取り直させる)
+  @Get('received')
+  async listReceived(@Headers('x-user-id') userId: string | undefined) {
+    return this.letters.listReceived(this.requireUserId(userId));
+  }
+
   /// 符号で手紙を受け取る。最初に開いた端末に紐づく
+  /// この経路より前に sent / received を宣言しないと :code に食われる
   @Get(':code')
   async findByCode(
     @Headers('x-user-id') userId: string | undefined,

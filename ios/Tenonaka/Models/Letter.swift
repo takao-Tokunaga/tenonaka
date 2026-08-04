@@ -32,6 +32,34 @@ struct Letter: Identifiable, Hashable, Sendable {
     }
 }
 
+/// 受け取った手紙の控え。
+///
+/// **本文を持たない。** 読み直すときもサーバーから取り直して読む画面を通す。
+/// 手元に全文を置いてしまうと、握らないと読めないという機構が読み直しで崩れる。
+/// これは本文の保管場所ではなく、符号の保管場所である。
+struct ReceivedLetter: Identifiable, Hashable, Sendable {
+    var code: String
+    var senderName: String?
+    var sentAt: Date
+    var claimedAt: Date?
+    /// 封をした瞬間の送り主の脈
+    var senderBpm: Double?
+    /// 自分がどう読んだか
+    var receipt: ReadReceipt?
+
+    var id: String { code }
+
+    /// 受け取った日。漢数字で組む
+    var claimedDateText: String {
+        guard let claimedAt else { return "" }
+        let parts = Calendar.current.dateComponents([.year, .month, .day], from: claimedAt)
+        guard let year = parts.year, let month = parts.month, let day = parts.day else {
+            return ""
+        }
+        return "\(KanjiNumber.year(year))年\(KanjiNumber.of(month))月\(KanjiNumber.of(day))日"
+    }
+}
+
 /// 読まれ方の記録。内容への返信ではなく、費やされた時間だけが返る。
 struct ReadReceipt: Hashable, Sendable {
     /// 生きた手が握っていた合計秒数

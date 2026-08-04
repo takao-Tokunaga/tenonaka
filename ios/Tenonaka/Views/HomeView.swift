@@ -1,7 +1,9 @@
 import SwiftUI
 
 /// 入口。手紙を書くか、符号で受け取るか。
-/// 送った手紙の「読まれ方」がここに返ってくる。
+///
+/// 受け取った手紙は棚に残るが、**本文は手元に持たない**。
+/// 開くたびにサーバーから取り直して読む画面を通すので、読み直しでも握る必要がある。
 struct HomeView: View {
     @EnvironmentObject private var store: LetterStore
 
@@ -9,39 +11,60 @@ struct HomeView: View {
     @State private var isReceiving = false
     @State private var isConnectionSheetOpen = false
 
+    /// 棚から開いた手紙。取り直してから読む画面に入る
+    @State private var openedLetter: Letter?
+    @State private var openingCode: String?
+    @State private var failureText: String?
+
     var body: some View {
         ZStack {
             PaperSurface(showsRules: false)
                 .ignoresSafeArea()
 
-            VStack(alignment: .leading, spacing: 0) {
-                title
+            ScrollView {
+                VStack(alignment: .leading, spacing: 0) {
+                    title
 
-                actions
-                    .padding(.top, 40)
+                    actions
+                        .padding(.top, 36)
 
-                sentSection
-                    .padding(.top, 44)
+                    if let failureText {
+                        Text(failureText)
+                            .font(Mincho.font(12.5))
+                            .foregroundStyle(Paper.ribbon)
+                            .padding(.top, 18)
+                    }
 
-                Spacer()
+                    receivedSection
+                        .padding(.top, 40)
 
-                if store.isOffline {
-                    Text("サーバーに繋がっていません")
-                        .font(Mincho.font(11.5))
-                        .foregroundStyle(Paper.ribbon.opacity(0.8))
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .padding(.bottom, 14)
+                    sentSection
+                        .padding(.top, 38)
+
+                    if store.isOffline {
+                        Text("サーバーに繋がっていません")
+                            .font(Mincho.font(11.5))
+                            .foregroundStyle(Paper.ribbon.opacity(0.8))
+                            .frame(maxWidth: .infinity, alignment: .center)
+                            .padding(.top, 30)
+                    }
                 }
+                .padding(.horizontal, 32)
+                .padding(.top, 46)
+                .padding(.bottom, 50)
             }
-            .padding(.horizontal, 32)
-            .padding(.top, 46)
         }
-        .task { await store.refreshSent() }
+        .task { await store.refresh() }
         .fullScreenCover(isPresented: $isComposing) {
             LetterComposeView()
         }
         .fullScreenCover(isPresented: $isReceiving) {
             ReceiveLetterView()
+        }
+        .fullScreenCover(item: $openedLetter) { letter in
+            LetterReadingView(letter: letter) { receipt in
+                Task { await store.submitReceipt(code: letter.code, receipt: receipt) }
+            }
         }
         .sheet(isPresented: $isConnectionSheetOpen) {
             ConnectionSheet()
@@ -50,7 +73,7 @@ struct HomeView: View {
 
     private var title: some View {
         VStack(alignment: .leading, spacing: 14) {
-            Text("手紙")
+            Text("手のなか")
                 .font(Mincho.font(30, bold: true))
                 .kerning(10)
                 .foregroundStyle(Paper.ink)
@@ -111,33 +134,152 @@ struct HomeView: View {
         .buttonStyle(.plain)
     }
 
+    // MARK: - 受け取った手紙
+
+    private var receivedSection: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            sectionTitle("受け取った手紙")
+
+            if store.received.isEmpty {
+                Text("まだありません")
+                    .font(Mincho.font(12.5))
+                    .foregroundStyle(Paper.inkFaint)
+            } else {
+                VStack(spacing: 0) {
+                    ForEach(store.received) { letter in
+                        Button {
+                            Task { await open(code: letter.code) }
+                        } label: {
+                            ReceivedLetterRow(
+                                letter: letter,
+                                isOpening: openingCode == letter.code
+                            )
+                        }
+                        .buttonStyle(.plain)
+
+                        Rectangle()
+                            .fill(Paper.rule.opacity(0.4))
+                            .frame(height: 0.6)
+                    }
+                }
+
+                Text("開くたびに、もう一度手に持つ必要があります。")
+                    .font(Mincho.font(11))
+                    .foregroundStyle(Paper.inkFaint)
+                    .padding(.top, 4)
+            }
+        }
+    }
+
+    /// 棚から開く。本文は手元に無いので取り直す
+    private func open(code: String) async {
+        guard openingCode == nil else { return }
+        openingCode = code
+        failureText = nil
+        do {
+            openedLetter = try await store.fetch(code: code)
+        } catch {
+            failureText = error.localizedDescription
+        }
+        openingCode = nil
+    }
+
     // MARK: - 送った手紙
 
     private var sentSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("送った手紙")
-                .font(Mincho.font(12))
-                .kerning(2)
-                .foregroundStyle(Paper.inkSoft)
+            sectionTitle("送った手紙")
 
             if store.sent.isEmpty {
                 Text("まだありません")
                     .font(Mincho.font(12.5))
                     .foregroundStyle(Paper.inkFaint)
             } else {
-                ScrollView {
-                    VStack(spacing: 0) {
-                        ForEach(store.sent) { letter in
-                            SentLetterRow(letter: letter)
-                            Rectangle()
-                                .fill(Paper.rule.opacity(0.4))
-                                .frame(height: 0.6)
-                        }
+                VStack(spacing: 0) {
+                    ForEach(store.sent) { letter in
+                        SentLetterRow(letter: letter)
+                        Rectangle()
+                            .fill(Paper.rule.opacity(0.4))
+                            .frame(height: 0.6)
                     }
                 }
-                .frame(maxHeight: 280)
             }
         }
+    }
+
+    private func sectionTitle(_ text: String) -> some View {
+        Text(text)
+            .font(Mincho.font(12))
+            .kerning(2)
+            .foregroundStyle(Paper.inkSoft)
+    }
+}
+
+/// 受け取った手紙1件。本文は持たないので、符号と差出人だけが並ぶ。
+struct ReceivedLetterRow: View {
+    let letter: ReceivedLetter
+    let isOpening: Bool
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(alignment: .lastTextBaseline, spacing: 10) {
+                    Text(letter.senderName ?? "差出人不明")
+                        .font(Mincho.font(15))
+                        .foregroundStyle(Paper.ink)
+
+                    Text(letter.code)
+                        .font(.system(size: 11.5, design: .monospaced))
+                        .foregroundStyle(Paper.inkFaint)
+                }
+
+                HStack(spacing: 12) {
+                    if !letter.claimedDateText.isEmpty {
+                        Text("受け取り \(letter.claimedDateText)")
+                            .font(Mincho.font(11))
+                            .foregroundStyle(Paper.inkFaint)
+                    }
+
+                    if let receipt = letter.receipt {
+                        if receipt.completed {
+                            Text("読み終えた")
+                                .font(Mincho.font(11))
+                                .foregroundStyle(Paper.inkSoft)
+                        } else {
+                            Text("途中まで")
+                                .font(Mincho.font(11))
+                                .foregroundStyle(Paper.ribbon.opacity(0.75))
+                        }
+                    } else {
+                        Text("まだ読んでいない")
+                            .font(Mincho.font(11))
+                            .foregroundStyle(Paper.ribbon.opacity(0.75))
+                    }
+                }
+            }
+
+            Spacer()
+
+            if isOpening {
+                Text("開いている")
+                    .font(Mincho.font(11))
+                    .foregroundStyle(Paper.inkFaint)
+            } else {
+                // 封の跡。送り主が押した脈
+                if let bpm = letter.senderBpm {
+                    ZStack {
+                        Circle()
+                            .fill(Paper.ribbon.opacity(0.13))
+                            .frame(width: 34, height: 34)
+                        Text("\(Int(bpm.rounded()))")
+                            .font(Mincho.font(13))
+                            .foregroundStyle(Paper.ribbon.opacity(0.85))
+                    }
+                }
+            }
+        }
+        .padding(.vertical, 14)
+        .contentShape(Rectangle())
     }
 }
 
@@ -149,8 +291,8 @@ struct SentLetterRow: View {
         VStack(alignment: .leading, spacing: 7) {
             HStack(alignment: .lastTextBaseline) {
                 Text(letter.code)
-                    .font(.system(size: 15, weight: .semibold, design: .serif))
-                    .kerning(2)
+                    .font(.system(size: 14, weight: .semibold, design: .serif))
+                    .kerning(1.5)
                     .foregroundStyle(Paper.ink)
 
                 if let recipient = letter.recipientName {
@@ -185,7 +327,6 @@ struct SentLetterRow: View {
                     }
                 }
             } else if letter.claimedAt != nil {
-                // 受け取られてはいるが、まだ読み終えていない
                 Text("受け取られました")
                     .font(Mincho.font(12))
                     .foregroundStyle(Paper.inkSoft)
