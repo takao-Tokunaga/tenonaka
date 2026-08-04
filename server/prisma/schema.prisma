@@ -7,39 +7,26 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-/// 住所。
+/// 海に流す手紙。
 ///
-/// 端末ごとに一度だけ発行し、以後変わらない。現実の住所と同じく、
-/// 知っている相手からは誰でも手紙が届く。
-/// 意味のある言葉を3つ繋いだ形(komorebi-nagisa-shigure)。
-model Address {
-  address   String   @id
-  userId    String   @unique
-  createdAt DateTime @default(now())
-}
-
-/// 手紙。
-///
-/// 送るときに書いた人の脈が刻まれ(生きた身体が送った証)、
-/// 読まれたときに「生きた手が何秒握っていたか」が返る。
-/// 内容への返信は持たない。返るのは費やされた時間だけ。
+/// 宛先を持たない。流すときに書いた人の脈が刻まれ、
+/// 見知らぬ誰かが拾って読み、読み終えたときの脈と握っていた時間が返る。
+/// 返信は持たない。返るのは身体の事実だけ。
 model Letter {
-  id            String   @id @default(uuid())
-  /// 受け取る人に口で伝える短い符号
-  code          String   @unique
-  body          String
-  senderName    String?
+  id           String   @id @default(uuid())
+  /// 手紙の識別子。UI には出さないが、読み直しの取得に使う
+  code         String   @unique
+  body         String
+  senderName   String?
+  /// 宛名。海に流すので相手は決まっていないが「だれかへ」と書ける
   recipientName String?
-  /// 宛先の住所。指定して送った場合、受取人は作成時点で確定する
-  /// (符号を推測される余地が無くなる)
-  recipientAddress String?
-  /// 封をした瞬間の脈
-  senderBpm     Float?
-  senderUserId  String
-  sentAt        DateTime @default(now())
+  /// 流した瞬間の脈。生きた身体が流した証
+  senderBpm    Float?
+  senderUserId String
+  sentAt       DateTime @default(now())
 
-  /// 最初に開いた端末。手渡しは一人にしか渡せないので、以後は他から読めない。
-  /// 符号を総当たりしても、当たった手紙のほとんどが既に受け取られ済みになる。
+  /// 拾った端末。瓶は一人にしか拾われない。
+  /// null のあいだが「まだ海にある」状態
   claimedByUserId String?
   claimedAt       DateTime?
 
@@ -47,10 +34,14 @@ model Letter {
   readHeldSeconds  Float?
   readReleaseCount Int?
   readCompleted    Boolean?
+  /// 読み終えたときの読み手の脈。手紙の効果が読んだ人の身体で測られる
+  readReaderBpm    Float?
   readAt           DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@index([senderUserId, sentAt])
+  /// 海から拾うときに引く索引(まだ拾われていない手紙)
+  @@index([claimedByUserId, sentAt])
 }

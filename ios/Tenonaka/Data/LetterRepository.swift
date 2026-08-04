@@ -49,24 +49,12 @@ struct LetterRepository {
         session = URLSession(configuration: configuration)
     }
 
-    /// 自分の住所。持っていなければサーバーが発行する。何度呼んでも同じ値
-    func myAddress() async throws -> String {
-        struct Response: Decodable { let address: String }
-        let data = try await send(path: "letters/address", method: "POST")
-        guard let decoded = try? JSONDecoder().decode(Response.self, from: data) else {
-            throw LetterError.decoding
-        }
-        return decoded.address
-    }
-
-    /// 脈を渡さないと送れない。ここがこのアプリの関門なので、引数から外せないようにしてある。
-    ///
-    /// recipientAddress を渡すと相手の棚に直接届く。渡さなければ符号で手渡しする。
-    func send(
+    /// 海に流す。脈を渡さないと流せない。
+    /// ここがこのアプリの関門なので、引数から外せないようにしてある。
+    func cast(
         body: String,
         senderName: String?,
         recipientName: String?,
-        recipientAddress: String?,
         bpm: Double
     ) async throws -> Letter {
         var payload: [String: Any] = ["body": body, "senderBpm": bpm]
@@ -74,18 +62,30 @@ struct LetterRepository {
         if let recipientName = recipientName?.nilIfBlank {
             payload["recipientName"] = recipientName
         }
-        if let recipientAddress = recipientAddress?.nilIfBlank {
-            payload["recipientAddress"] = recipientAddress.trimmed.lowercased()
-        }
-
-        let data = try await send(
-            path: "letters",
-            method: "POST",
-            payload: payload
-        )
+        let data = try await send(path: "letters", method: "POST", payload: payload)
         return try decodeLetter(data)
     }
 
+    /// 海から一通拾う。流した数だけ拾える
+    func pickUp() async throws -> Letter {
+        let data = try await send(path: "letters/pickup", method: "POST")
+        return try decodeLetter(data)
+    }
+
+    /// 海の様子。漂っている数と、あと何通拾えるか
+    func sea() async throws -> SeaState {
+        struct Response: Decodable {
+            let drifting: Int
+            let canPickUp: Int
+        }
+        let data = try await send(path: "letters/sea", method: "GET")
+        guard let decoded = try? JSONDecoder().decode(Response.self, from: data) else {
+            throw LetterError.decoding
+        }
+        return SeaState(drifting: decoded.drifting, canPickUp: decoded.canPickUp)
+    }
+
+    /// 拾った手紙を読み直す
     func fetch(code: String) async throws -> Letter {
         let data = try await send(path: "letters/\(code.uppercased())", method: "GET")
         return try decodeLetter(data)
@@ -108,16 +108,19 @@ struct LetterRepository {
         return dtos.map { $0.toDomain() }
     }
 
-    /// 読まれ方を返す。内容への返信は含まない。
+    /// 読まれ方を流した人に返す。内容への返信は含まない。
+    /// 脈を添えると、手紙の効果が読んだ人の身体で測られたことになる。
     func submitReceipt(code: String, receipt: ReadReceipt) async throws {
+        var payload: [String: Any] = [
+            "heldSeconds": receipt.heldSeconds,
+            "releaseCount": receipt.releaseCount,
+            "completed": receipt.completed,
+        ]
+        if let readerBpm = receipt.readerBpm { payload["readerBpm"] = readerBpm }
         _ = try await send(
             path: "letters/\(code.uppercased())/receipt",
             method: "POST",
-            payload: [
-                "heldSeconds": receipt.heldSeconds,
-                "releaseCount": receipt.releaseCount,
-                "completed": receipt.completed,
-            ]
+            payload: payload
         )
     }
 
@@ -175,6 +178,7 @@ private struct LetterDTO: Decodable {
         let heldSeconds: Double
         let releaseCount: Int
         let completed: Bool
+        let readerBpm: Double?
         let readAt: String
     }
 
@@ -182,7 +186,6 @@ private struct LetterDTO: Decodable {
     let body: String
     let senderName: String?
     let recipientName: String?
-    let recipientAddress: String?
     let senderBpm: Double?
     let sentAt: String
     let claimedAt: String?
@@ -194,7 +197,6 @@ private struct LetterDTO: Decodable {
             body: body,
             senderName: senderName,
             recipientName: recipientName,
-            recipientAddress: recipientAddress,
             senderBpm: senderBpm,
             sentAt: ISO8601.date(from: sentAt) ?? Date(),
             claimedAt: claimedAt.flatMap(ISO8601.date(from:)),
@@ -203,6 +205,7 @@ private struct LetterDTO: Decodable {
                     heldSeconds: $0.heldSeconds,
                     releaseCount: $0.releaseCount,
                     completed: $0.completed,
+                    readerBpm: $0.readerBpm,
                     readAt: ISO8601.date(from: $0.readAt) ?? Date()
                 )
             }
@@ -214,7 +217,6 @@ private struct LetterDTO: Decodable {
 private struct ReceivedLetterDTO: Decodable {
     let code: String
     let senderName: String?
-    let recipientAddress: String?
     let senderBpm: Double?
     let sentAt: String
     let claimedAt: String?
@@ -224,7 +226,6 @@ private struct ReceivedLetterDTO: Decodable {
         ReceivedLetter(
             code: code,
             senderName: senderName,
-            recipientAddress: recipientAddress,
             sentAt: ISO8601.date(from: sentAt) ?? Date(),
             claimedAt: claimedAt.flatMap(ISO8601.date(from:)),
             senderBpm: senderBpm,
@@ -233,6 +234,7 @@ private struct ReceivedLetterDTO: Decodable {
                     heldSeconds: $0.heldSeconds,
                     releaseCount: $0.releaseCount,
                     completed: $0.completed,
+                    readerBpm: $0.readerBpm,
                     readAt: ISO8601.date(from: $0.readAt) ?? Date()
                 )
             }

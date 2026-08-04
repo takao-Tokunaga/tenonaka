@@ -48,11 +48,13 @@ final class LetterReadingSession: ObservableObject {
         return Double(revealedCount) / Double(characters.count)
     }
 
-    var receipt: ReadReceipt {
+    /// 流した人に返す記録。読み終えて封をしていれば、自分の脈も添える
+    func receipt(readerBpm: Double?) -> ReadReceipt {
         ReadReceipt(
             heldSeconds: heldSeconds,
             releaseCount: releaseCount,
             completed: isFinished,
+            readerBpm: readerBpm,
             readAt: Date()
         )
     }

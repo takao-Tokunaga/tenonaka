@@ -1,21 +1,20 @@
 import Foundation
 
-/// 手紙。
-/// 送るときに書いた人の脈が刻まれ、読まれたときに「生きた手が何秒持っていたか」が返る。
+/// 海に流す手紙。
+/// 流すときに書いた人の脈が刻まれ、拾った誰かが読み終えたときの
+/// 脈と握っていた時間が返る。
 struct Letter: Identifiable, Hashable, Sendable {
-    /// 受け取る人に口で伝える短い符号。これが手紙の識別子でもある
+    /// 手紙の識別子。UI には出さないが、読み直しの取得に使う
     var code: String
     var body: String
     /// 署名(差出人)
     var senderName: String?
-    /// 宛名(受取人)
+    /// 宛名。海に流すので相手は決まっていないが「だれかへ」と書ける
     var recipientName: String?
-    /// 宛先の住所。符号で渡した手紙では nil
-    var recipientAddress: String?
-    /// 封をした瞬間の脈
+    /// 流した瞬間の脈
     var senderBpm: Double?
     var sentAt: Date
-    /// 受け取られた時刻。読み終えたかとは別の状態
+    /// 拾われた時刻。読み終えたかとは別の状態
     var claimedAt: Date?
     /// 読まれ方の記録。まだ読まれていなければ nil
     var receipt: ReadReceipt?
@@ -42,8 +41,6 @@ struct Letter: Identifiable, Hashable, Sendable {
 struct ReceivedLetter: Identifiable, Hashable, Sendable {
     var code: String
     var senderName: String?
-    /// 自分の住所に届いた手紙かどうかの手がかり
-    var recipientAddress: String?
     var sentAt: Date
     var claimedAt: Date?
     /// 封をした瞬間の送り主の脈
@@ -53,7 +50,7 @@ struct ReceivedLetter: Identifiable, Hashable, Sendable {
 
     var id: String { code }
 
-    /// 受け取った日。漢数字で組む
+    /// 拾った日。漢数字で組む
     var claimedDateText: String {
         guard let claimedAt else { return "" }
         let parts = Calendar.current.dateComponents([.year, .month, .day], from: claimedAt)
@@ -72,6 +69,8 @@ struct ReadReceipt: Hashable, Sendable {
     var releaseCount: Int
     /// 最後まで現れたか
     var completed: Bool
+    /// 読み終えたときの読み手の脈。封をせずに閉じた場合は nil
+    var readerBpm: Double?
     var readAt: Date
 
     var heldText: String {
@@ -137,7 +136,7 @@ extension Letter {
         返事はいりません。読んでくれただけで、じゅうぶんです。
         """,
         senderName: "母より",
-        recipientName: "あなたへ",
+        recipientName: "だれかへ",
         senderBpm: 74,
         sentAt: Date(),
         receipt: nil

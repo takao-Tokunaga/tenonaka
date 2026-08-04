@@ -7,17 +7,13 @@ import {
   Param,
   Post,
 } from '@nestjs/common';
-import { AddressesService } from './addresses.service';
 import { CreateLetterDto } from './dto/create-letter.dto';
 import { ReadReceiptDto } from './dto/read-receipt.dto';
 import { LettersService } from './letters.service';
 
 @Controller('letters')
 export class LettersController {
-  constructor(
-    private readonly letters: LettersService,
-    private readonly addresses: AddressesService,
-  ) {}
+  constructor(private readonly letters: LettersService) {}
 
   /**
    * 端末の識別子。
@@ -37,43 +33,41 @@ export class LettersController {
     return trimmed;
   }
 
-  /// 手紙を送る。脈が無いと作れない(CreateLetterDto で senderBpm を必須にしている)
+  /// 海に流す。脈が無いと流せない(CreateLetterDto で senderBpm を必須にしている)
   @Post()
-  async create(
+  async cast(
     @Headers('x-user-id') userId: string | undefined,
     @Body() dto: CreateLetterDto,
   ) {
-    return this.letters.create(this.requireUserId(userId), dto);
+    return this.letters.cast(this.requireUserId(userId), dto);
   }
 
-  /// 自分が送った手紙と、その読まれ方
+  /// 海から一通拾う。流した数だけ拾える
+  @Post('pickup')
+  async pickUp(@Headers('x-user-id') userId: string | undefined) {
+    return this.letters.pickUp(this.requireUserId(userId));
+  }
+
+  /// いま海に何通あるか、あと何通拾えるか
+  @Get('sea')
+  async sea(@Headers('x-user-id') userId: string | undefined) {
+    return this.letters.seaCount(this.requireUserId(userId));
+  }
+
+  /// 自分が流した手紙と、返ってきた身体の記録
   @Get('sent')
   async listSent(@Headers('x-user-id') userId: string | undefined) {
     return this.letters.listSent(this.requireUserId(userId));
   }
 
-  /**
-   * 自分の住所。持っていなければ発行する。
-   *
-   * POST にしているのは、初回に住所を作る副作用があるため。
-   * 二回目以降は同じ住所を返すので何度呼んでも安全。
-   */
-  @Post('address')
-  async myAddress(@Headers('x-user-id') userId: string | undefined) {
-    const address = await this.addresses.ensureForUser(
-      this.requireUserId(userId),
-    );
-    return { address };
-  }
-
-  /// 自分が受け取った手紙の一覧。本文は含まない(読むには取り直させる)
+  /// 自分が拾った手紙の一覧。本文は含まない(読むには取り直させる)
   @Get('received')
   async listReceived(@Headers('x-user-id') userId: string | undefined) {
     return this.letters.listReceived(this.requireUserId(userId));
   }
 
-  /// 符号で手紙を受け取る。最初に開いた端末に紐づく
-  /// この経路より前に sent / received を宣言しないと :code に食われる
+  /// 拾った手紙を読み直す。
+  /// この経路より前に sent / received / sea を宣言しないと :code に食われる
   @Get(':code')
   async findByCode(
     @Headers('x-user-id') userId: string | undefined,
@@ -82,7 +76,7 @@ export class LettersController {
     return this.letters.findByCode(this.requireUserId(userId), code);
   }
 
-  /// 読まれ方を返す。受け取った端末からのみ
+  /// 読まれ方を流した人に返す。拾った端末からのみ
   @Post(':code/receipt')
   async recordReceipt(
     @Headers('x-user-id') userId: string | undefined,

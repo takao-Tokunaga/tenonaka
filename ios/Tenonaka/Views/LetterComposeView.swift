@@ -5,7 +5,6 @@ struct LetterComposeView: View {
     @EnvironmentObject private var store: LetterStore
     @Environment(\.dismiss) private var dismiss
 
-    @State private var recipientAddress = ""
     @State private var recipientName = ""
     @State private var senderName = ""
     @State private var body_ = ""
@@ -29,12 +28,11 @@ struct LetterComposeView: View {
 
                 ScrollView {
                     VStack(alignment: .leading, spacing: 22) {
-                        addressField
-                        field("宛名", placeholder: "誰へ", text: $recipientName)
+                        field("宛名", placeholder: "だれかへ", text: $recipientName)
 
                         ZStack(alignment: .topLeading) {
                             if body_.isEmpty {
-                                Text("要約されたくないことを、書く。")
+                                Text("見知らぬ誰かに宛てて、要約されたくないことを。")
                                     .font(Mincho.font(17))
                                     .foregroundStyle(Paper.inkFaint.opacity(0.7))
                                     .padding(.top, 8)
@@ -83,7 +81,7 @@ struct LetterComposeView: View {
 
             Spacer()
 
-            Text("手紙を書く")
+            Text("海に流す")
                 .font(Mincho.font(15, bold: true))
                 .kerning(3)
                 .foregroundStyle(Paper.ink)
@@ -94,7 +92,7 @@ struct LetterComposeView: View {
                 isBodyFocused = false
                 isSealing = true
             } label: {
-                Text(isSending ? "送っている" : "封をする")
+                Text(isSending ? "流している" : "封をする")
                     .font(Mincho.font(13.5, bold: true))
                     .foregroundStyle(canSeal ? Paper.ribbon : Paper.inkFaint)
             }
@@ -104,37 +102,6 @@ struct LetterComposeView: View {
         .padding(.horizontal, 30)
         .padding(.top, 24)
         .padding(.bottom, 18)
-    }
-
-    /// 宛先の住所。空なら符号を口で伝えて渡す
-    private var addressField: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            HStack(alignment: .lastTextBaseline) {
-                Text("宛先")
-                    .font(Mincho.font(11.5))
-                    .kerning(1.5)
-                    .foregroundStyle(Paper.inkFaint)
-                Spacer()
-                Text(recipientAddress.trimmed.isEmpty ? "空なら符号で渡す" : "相手の棚に直接届く")
-                    .font(Mincho.font(10.5))
-                    .foregroundStyle(Paper.inkFaint.opacity(0.8))
-            }
-
-            // 表記の揺れはサーバー側で正規化するので、ここでは削らない。
-            // かな・カナ・ローマ字、区切りの違いをそのまま通す
-            TextField("みなと・こずえ・かね", text: $recipientAddress)
-                .font(Mincho.font(17))
-                .foregroundStyle(Paper.ink)
-                .tint(Paper.ribbon)
-                .textInputAutocapitalization(.never)
-                .autocorrectionDisabled()
-                .padding(.bottom, 7)
-                .overlay(alignment: .bottom) {
-                    Rectangle()
-                        .fill(Paper.rule.opacity(0.7))
-                        .frame(height: 0.6)
-                }
-        }
     }
 
     private func field(_ label: String, placeholder: String, text: Binding<String>) -> some View {
@@ -160,11 +127,10 @@ struct LetterComposeView: View {
         isSending = true
         failureText = nil
         do {
-            let letter = try await store.send(
+            let letter = try await store.cast(
                 body: body_,
                 senderName: senderName.nilIfBlank,
                 recipientName: recipientName.nilIfBlank,
-                recipientAddress: recipientAddress.nilIfBlank,
                 bpm: bpm
             )
             sentLetter = letter
@@ -175,7 +141,8 @@ struct LetterComposeView: View {
     }
 }
 
-/// 送ったあとに出る符号。これを相手に口で伝える。
+/// 流したあとの画面。符号は見せない。宛先も相手も無いので、
+/// 伝えることは「海に出た」ことだけ。
 struct SentCodeView: View {
     let letter: Letter
     let onClose: () -> Void
@@ -187,48 +154,43 @@ struct SentCodeView: View {
             PaperSurface(showsRules: false)
                 .ignoresSafeArea()
 
-            VStack(spacing: 26) {
+            VStack(spacing: 24) {
                 Spacer()
 
-                Text("封をして送りました")
-                    .font(Mincho.font(15))
-                    .foregroundStyle(Paper.inkSoft)
-
-                // 宛先を指定した手紙は既に届いているので、符号は主役ではない
-                if let address = letter.recipientAddress {
-                    Text(address)
-                        .font(Mincho.font(24))
-                        .kerning(1.5)
-                        .foregroundStyle(Paper.ink)
-                        .multilineTextAlignment(.center)
-                        .padding(.horizontal, 24)
-
-                    Text("この住所に届きました")
-                        .font(Mincho.font(12.5))
-                        .foregroundStyle(Paper.inkFaint)
-                } else {
-                    Text(letter.code)
-                        .font(.system(
-                            size: letter.code.count > 8 ? 34 : 50,
-                            weight: .semibold,
-                            design: .serif
-                        ))
-                        .kerning(letter.code.count > 8 ? 3 : 8)
-                        .foregroundStyle(Paper.ink)
-                        .minimumScaleFactor(0.6)
-                        .lineLimit(1)
-                        .padding(.horizontal, 24)
-
-                    Text("この符号を相手に声で伝えてください")
-                        .font(Mincho.font(12.5))
-                        .foregroundStyle(Paper.inkFaint)
-                }
+                Text("海に流しました")
+                    .font(Mincho.font(19))
+                    .foregroundStyle(Paper.ink)
 
                 if let bpm = letter.senderBpm {
-                    Text("脈 \(Int(bpm.rounded())) で封をされました")
+                    ZStack {
+                        Circle()
+                            .fill(Paper.ribbon.opacity(0.92))
+                            .frame(width: 84, height: 84)
+                        VStack(spacing: 0) {
+                            Text("\(Int(bpm.rounded()))")
+                                .font(Mincho.font(31, bold: true))
+                            Text("拍")
+                                .font(Mincho.font(11))
+                        }
+                        .foregroundStyle(Paper.base)
+                    }
+                    .shadow(color: .black.opacity(0.18), radius: 7, y: 3)
+                }
+
+                VStack(spacing: 7) {
+                    Text("いつか、見知らぬ誰かが拾います")
+                        .font(Mincho.font(13))
+                        .foregroundStyle(Paper.inkSoft)
+                    Text("返ってくるのは、その人が持っていた時間と脈だけです")
                         .font(Mincho.font(11.5))
                         .foregroundStyle(Paper.inkFaint)
                 }
+                .multilineTextAlignment(.center)
+
+                Text("あなたも一通、拾えるようになりました")
+                    .font(Mincho.font(12))
+                    .foregroundStyle(Paper.ribbon.opacity(0.85))
+                    .padding(.top, 6)
 
                 Spacer()
 
@@ -243,6 +205,7 @@ struct SentCodeView: View {
                 .buttonStyle(.plain)
                 .padding(.bottom, 34)
             }
+            .padding(.horizontal, 32)
         }
     }
 }

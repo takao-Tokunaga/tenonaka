@@ -6,9 +6,11 @@ import SwiftUI
 struct LetterReadingView: View {
     @StateObject private var session: LetterReadingSession
     @Environment(\.dismiss) private var dismiss
-    @State private var showsReceipt = false
-    /// 0: 本文のみ / 1: 後付け(日付・署名・宛名)が現れた / 2: 報告も出た
+    /// 0: 本文のみ / 1: 後付け(日付・署名・宛名)が現れた / 2: 返す導線も出た
     @State private var endingStage = 0
+    /// 読み終えて封をしたときの、自分の脈
+    @State private var isSealing = false
+    @State private var readerBpm: Double?
 
     /// 読まれ方を送り主に返す
     private let onReceipt: (ReadReceipt) -> Void
@@ -74,20 +76,25 @@ struct LetterReadingView: View {
         .onAppear { session.start() }
         .onDisappear {
             session.stop()
-            // 途中で閉じられても、そこまで費やされた時間は返す
-            if session.heldSeconds > 0 { onReceipt(session.receipt) }
+            // 途中で閉じられても、そこまで費やされた時間は返す。
+            // 脈を封じていればそれも一緒に返る
+            if session.heldSeconds > 0 {
+                onReceipt(session.receipt(readerBpm: readerBpm))
+            }
         }
         // 本文が現れ切ってから、間を置いて後付け → 報告の順に落ち着かせる
         .task(id: session.isFinished) {
             guard session.isFinished else { return }
-            onReceipt(session.receipt)
             try? await Task.sleep(for: .milliseconds(800))
             withAnimation(.easeIn(duration: 1.1)) { endingStage = 1 }
             try? await Task.sleep(for: .milliseconds(1600))
             withAnimation(.easeIn(duration: 0.7)) { endingStage = 2 }
         }
-        .sheet(isPresented: $showsReceipt) {
-            ReadReceiptView(receipt: session.receipt)
+        .sheet(isPresented: $isSealing) {
+            SealSheet { bpm in
+                readerBpm = bpm
+                onReceipt(session.receipt(readerBpm: bpm))
+            }
         }
     }
 
@@ -96,7 +103,7 @@ struct LetterReadingView: View {
     private var header: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .lastTextBaseline) {
-                Text("手紙")
+                Text("海から")
                     .font(Mincho.font(13))
                     .kerning(4)
                     .foregroundStyle(Paper.inkSoft)
@@ -104,7 +111,7 @@ struct LetterReadingView: View {
                 Spacer()
 
                 if let bpm = session.letter.senderBpm {
-                    // 送り主が封をしたときの脈。生きた身体が送った証
+                    // 流した人が封をしたときの脈。生きた身体が流した証
                     Text("脈 \(Int(bpm.rounded())) で封をされた手紙")
                         .font(Mincho.font(11))
                         .foregroundStyle(Paper.inkFaint)
@@ -189,87 +196,74 @@ struct LetterReadingView: View {
                 .fill(Paper.rule.opacity(0.6))
                 .frame(height: 0.6)
 
-            Text("あなたはこの手紙を \(session.receipt.heldText) 持っていました。")
+            Text("あなたはこの手紙を \(session.receipt(readerBpm: nil).heldText) 持っていました。")
                 .font(Mincho.font(13.5))
                 .foregroundStyle(Paper.inkSoft)
 
-            Text("それが送り主に伝わります。")
-                .font(Mincho.font(12))
-                .foregroundStyle(Paper.inkFaint)
-
-            HStack(spacing: 22) {
-                Button {
-                    showsReceipt = true
-                } label: {
-                    Text("返るものを見る")
-                        .font(Mincho.font(13.5, bold: true))
-                        .foregroundStyle(Paper.ribbon)
+            if let readerBpm {
+                // 返した後。流した人の脈と自分の脈が並ぶ
+                HStack(alignment: .center, spacing: 12) {
+                    pulseChip(session.letter.senderBpm, label: "流した人")
+                    Text("→")
+                        .font(Mincho.font(14))
+                        .foregroundStyle(Paper.inkFaint)
+                    pulseChip(readerBpm, label: "あなた")
                 }
-                Spacer()
+                .padding(.top, 4)
+
+                Text("流した人に返るのは、この時間とこの脈だけです。")
+                    .font(Mincho.font(12))
+                    .foregroundStyle(Paper.inkFaint)
+
                 Button {
                     dismiss()
                 } label: {
                     Text("とじる")
-                        .font(Mincho.font(13.5))
-                        .foregroundStyle(Paper.inkSoft)
+                        .font(Mincho.font(13.5, bold: true))
+                        .foregroundStyle(Paper.ribbon)
                 }
-            }
-            .buttonStyle(.plain)
-        }
-        .padding(.top, 34)
-    }
-}
-
-/// 送り主に返る内容。返信ではなく、費やされた時間だけ。
-struct ReadReceiptView: View {
-    let receipt: ReadReceipt
-    @Environment(\.dismiss) private var dismiss
-
-    var body: some View {
-        ZStack {
-            PaperSurface(showsRules: false)
-                .ignoresSafeArea()
-
-            VStack(alignment: .leading, spacing: 26) {
-                HStack {
-                    Text("送り主に返るもの")
-                        .font(Mincho.font(15, bold: true))
-                        .kerning(2)
-                        .foregroundStyle(Paper.ink)
-                    Spacer()
-                    Button("とじる") { dismiss() }
-                        .font(Mincho.font(13))
-                        .foregroundStyle(Paper.inkFaint)
-                        .buttonStyle(.plain)
-                }
-
-                VStack(alignment: .leading, spacing: 14) {
-                    row("生きた手が持っていた時間", receipt.heldText)
-                    row("途中で置かれた回数", "\(receipt.releaseCount)回")
-                    row("最後まで読まれたか", receipt.completed ? "はい" : "いいえ")
-                }
-
-                Text("内容への返信は含まれません。費やされた時間だけが返ります。")
-                    .font(Mincho.font(11.5))
+                .buttonStyle(.plain)
+                .padding(.top, 6)
+            } else {
+                Text("読み終えたときのあなたの脈を、封にして返せます。")
+                    .font(Mincho.font(12))
                     .lineSpacing(5)
                     .foregroundStyle(Paper.inkFaint)
 
-                Spacer()
+                Button {
+                    isSealing = true
+                } label: {
+                    Text("脈で封をして返す")
+                        .font(Mincho.font(15, bold: true))
+                        .foregroundStyle(Paper.base)
+                        .padding(.horizontal, 26)
+                        .padding(.vertical, 13)
+                        .background { Capsule().fill(Paper.ink.opacity(0.88)) }
+                }
+                .buttonStyle(.plain)
+                .padding(.top, 4)
+
+                Button {
+                    dismiss()
+                } label: {
+                    Text("返さずにとじる")
+                        .font(Mincho.font(12.5))
+                        .foregroundStyle(Paper.inkFaint)
+                }
+                .buttonStyle(.plain)
             }
-            .padding(.horizontal, 30)
-            .padding(.top, 28)
         }
+        .padding(.top, 34)
     }
 
-    private func row(_ label: String, _ value: String) -> some View {
-        HStack(alignment: .lastTextBaseline) {
+    private func pulseChip(_ bpm: Double?, label: String) -> some View {
+        VStack(spacing: 3) {
+            Text(bpm.map { "\(Int($0.rounded()))" } ?? "——")
+                .font(Mincho.font(26, bold: true))
+                .foregroundStyle(bpm == nil ? Paper.inkFaint : Paper.ribbon)
             Text(label)
-                .font(Mincho.font(12.5))
-                .foregroundStyle(Paper.inkSoft)
-            Spacer()
-            Text(value)
-                .font(Mincho.font(17, bold: true))
-                .foregroundStyle(Paper.ink)
+                .font(Mincho.font(10))
+                .foregroundStyle(Paper.inkFaint)
         }
     }
 }

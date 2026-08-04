@@ -1,9 +1,8 @@
 import SwiftUI
-import UIKit
 
-/// 入口。手紙を書くか、符号で受け取るか。
+/// 入口。海に流すか、海から拾うか。
 ///
-/// 受け取った手紙は棚に残るが、**本文は手元に持たない**。
+/// 拾った手紙は棚に残るが、**本文は手元に持たない**。
 /// 開くたびにサーバーから取り直して読む画面を通すので、読み直しでも握る必要がある。
 struct HomeView: View {
     @EnvironmentObject private var store: LetterStore
@@ -11,11 +10,11 @@ struct HomeView: View {
     @State private var isComposing = false
     @State private var isConnectionSheetOpen = false
 
-    /// 棚から開いた手紙。取り直してから読む画面に入る
+    /// 拾った、または棚から開いた手紙。取り直してから読む画面に入る
     @State private var openedLetter: Letter?
     @State private var openingCode: String?
+    @State private var isPickingUp = false
     @State private var failureText: String?
-    @State private var didCopyAddress = false
 
     var body: some View {
         ZStack {
@@ -27,11 +26,12 @@ struct HomeView: View {
                     title
 
                     actions
-                        .padding(.top, 36)
+                        .padding(.top, 34)
 
                     if let failureText {
                         Text(failureText)
                             .font(Mincho.font(12.5))
+                            .lineSpacing(5)
                             .foregroundStyle(Paper.ribbon)
                             .padding(.top, 18)
                     }
@@ -43,7 +43,7 @@ struct HomeView: View {
                         .padding(.top, 38)
 
                     if store.isOffline {
-                        Text("サーバーに繋がっていません")
+                        Text("海に繋がっていません")
                             .font(Mincho.font(11.5))
                             .foregroundStyle(Paper.ribbon.opacity(0.8))
                             .frame(maxWidth: .infinity, alignment: .center)
@@ -80,82 +80,54 @@ struct HomeView: View {
                     isConnectionSheetOpen = true
                 }
 
-            Text("読むには、手で持ち続けるしかない。")
+            Text("見知らぬ誰かの手紙は、\n手で持ち続けているあいだだけ現れる。")
                 .font(Mincho.font(13))
+                .lineSpacing(6)
                 .foregroundStyle(Paper.inkSoft)
 
             Rectangle()
                 .fill(Paper.rule.opacity(0.6))
                 .frame(width: 54, height: 0.8)
-
-            myAddressPlate
-                .padding(.top, 10)
         }
     }
 
-    /// 自分の住所。これを相手に教えると手紙が届く
-    private var myAddressPlate: some View {
-        HStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 6) {
-                Text("あなたの住所")
-                    .font(Mincho.font(10.5))
-                    .kerning(1.5)
-                    .foregroundStyle(Paper.inkFaint)
-
-                if let address = store.myAddress {
-                    Text(address)
-                        .font(Mincho.font(17))
-                        .kerning(1)
-                        .foregroundStyle(Paper.ink)
-                        .textSelection(.enabled)
-                } else {
-                    Text("——")
-                        .font(Mincho.font(17))
-                        .foregroundStyle(Paper.inkFaint.opacity(0.6))
-                }
-            }
-
-            Spacer()
-
-            // かなを打つのは手間なので、写して渡せるようにする
-            if let address = store.myAddress {
-                Button {
-                    UIPasteboard.general.string = address
-                    withAnimation(.easeOut(duration: 0.2)) { didCopyAddress = true }
-                    Task {
-                        try? await Task.sleep(for: .seconds(1.6))
-                        withAnimation(.easeIn(duration: 0.4)) { didCopyAddress = false }
-                    }
-                } label: {
-                    Text(didCopyAddress ? "写した" : "写す")
-                        .font(Mincho.font(12))
-                        .foregroundStyle(didCopyAddress ? Paper.inkSoft : Paper.ribbon)
-                }
-                .buttonStyle(.plain)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .padding(.horizontal, 14)
-        .padding(.vertical, 11)
-        .background {
-            RoundedRectangle(cornerRadius: 3)
-                .fill(Paper.base.opacity(0.45))
-                .overlay {
-                    RoundedRectangle(cornerRadius: 3)
-                        .stroke(Paper.rule.opacity(0.6), lineWidth: 0.6)
-                }
-        }
-    }
+    // MARK: - 流す・拾う
 
     private var actions: some View {
-        action("手紙を書く", detail: "書いて、脈で封をして送る") {
-            isComposing = true
+        VStack(spacing: 14) {
+            action(
+                "海に流す",
+                detail: "書いて、脈で封をして流す",
+                enabled: true
+            ) {
+                isComposing = true
+            }
+
+            action(
+                isPickingUp ? "拾っている" : "海から拾う",
+                detail: pickUpDetail,
+                enabled: store.sea.canPickUp > 0 && store.sea.drifting > 0 && !isPickingUp
+            ) {
+                Task { await pickUp() }
+            }
         }
+    }
+
+    /// 拾える条件を、断られる前に伝える
+    private var pickUpDetail: String {
+        if store.sea.canPickUp <= 0 {
+            return "拾うには、まず一通流す"
+        }
+        if store.sea.drifting <= 0 {
+            return "いま海に手紙はない"
+        }
+        return "海に \(store.sea.drifting)通 漂っている"
     }
 
     private func action(
         _ label: String,
         detail: String,
+        enabled: Bool,
         perform: @escaping () -> Void
     ) -> some View {
         Button(action: perform) {
@@ -163,7 +135,7 @@ struct HomeView: View {
                 VStack(alignment: .leading, spacing: 5) {
                     Text(label)
                         .font(Mincho.font(17, bold: true))
-                        .foregroundStyle(Paper.ink)
+                        .foregroundStyle(enabled ? Paper.ink : Paper.inkFaint)
                     Text(detail)
                         .font(Mincho.font(11.5))
                         .foregroundStyle(Paper.inkFaint)
@@ -174,21 +146,37 @@ struct HomeView: View {
             .padding(.vertical, 17)
             .background {
                 RoundedRectangle(cornerRadius: 3)
-                    .fill(Paper.base.opacity(0.6))
+                    .fill(Paper.base.opacity(enabled ? 0.6 : 0.3))
                     .overlay {
                         RoundedRectangle(cornerRadius: 3)
-                            .stroke(Paper.rule.opacity(0.75), lineWidth: 0.6)
+                            .stroke(
+                                Paper.rule.opacity(enabled ? 0.75 : 0.4),
+                                lineWidth: 0.6
+                            )
                     }
             }
         }
         .buttonStyle(.plain)
+        .disabled(!enabled)
     }
 
-    // MARK: - 受け取った手紙
+    private func pickUp() async {
+        guard !isPickingUp else { return }
+        isPickingUp = true
+        failureText = nil
+        do {
+            openedLetter = try await store.pickUp()
+        } catch {
+            failureText = error.localizedDescription
+        }
+        isPickingUp = false
+    }
+
+    // MARK: - 拾った手紙
 
     private var receivedSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            sectionTitle("受け取った手紙")
+            sectionTitle("拾った手紙")
 
             if store.received.isEmpty {
                 Text("まだありません")
@@ -234,11 +222,11 @@ struct HomeView: View {
         openingCode = nil
     }
 
-    // MARK: - 送った手紙
+    // MARK: - 流した手紙
 
     private var sentSection: some View {
         VStack(alignment: .leading, spacing: 16) {
-            sectionTitle("送った手紙")
+            sectionTitle("流した手紙")
 
             if store.sent.isEmpty {
                 Text("まだありません")
@@ -265,7 +253,7 @@ struct HomeView: View {
     }
 }
 
-/// 受け取った手紙1件。本文は持たないので、符号と差出人だけが並ぶ。
+/// 拾った手紙1件。本文は持たないので、差出人の名札と読み方だけが並ぶ。
 struct ReceivedLetterRow: View {
     let letter: ReceivedLetter
     let isOpening: Bool
@@ -273,19 +261,13 @@ struct ReceivedLetterRow: View {
     var body: some View {
         HStack(alignment: .top, spacing: 12) {
             VStack(alignment: .leading, spacing: 7) {
-                HStack(alignment: .lastTextBaseline, spacing: 10) {
-                    Text(letter.senderName ?? "差出人不明")
-                        .font(Mincho.font(15))
-                        .foregroundStyle(Paper.ink)
-
-                    Text(letter.code)
-                        .font(.system(size: 11, design: .monospaced))
-                        .foregroundStyle(Paper.inkFaint)
-                }
+                Text(letter.senderName ?? "名もなき誰か")
+                    .font(Mincho.font(15))
+                    .foregroundStyle(Paper.ink)
 
                 HStack(spacing: 12) {
                     if !letter.claimedDateText.isEmpty {
-                        Text("受け取り \(letter.claimedDateText)")
+                        Text("拾った \(letter.claimedDateText)")
                             .font(Mincho.font(11))
                             .foregroundStyle(Paper.inkFaint)
                     }
@@ -314,17 +296,15 @@ struct ReceivedLetterRow: View {
                 Text("開いている")
                     .font(Mincho.font(11))
                     .foregroundStyle(Paper.inkFaint)
-            } else {
-                // 封の跡。送り主が押した脈
-                if let bpm = letter.senderBpm {
-                    ZStack {
-                        Circle()
-                            .fill(Paper.ribbon.opacity(0.13))
-                            .frame(width: 34, height: 34)
-                        Text("\(Int(bpm.rounded()))")
-                            .font(Mincho.font(13))
-                            .foregroundStyle(Paper.ribbon.opacity(0.85))
-                    }
+            } else if let bpm = letter.senderBpm {
+                // 流した人が押した封の脈
+                ZStack {
+                    Circle()
+                        .fill(Paper.ribbon.opacity(0.13))
+                        .frame(width: 34, height: 34)
+                    Text("\(Int(bpm.rounded()))")
+                        .font(Mincho.font(13))
+                        .foregroundStyle(Paper.ribbon.opacity(0.85))
                 }
             }
         }
@@ -333,23 +313,16 @@ struct ReceivedLetterRow: View {
     }
 }
 
-/// 送った手紙1件。返ってくるのは費やされた時間だけ。
+/// 流した手紙1件。返ってくるのは身体の事実だけ。
 struct SentLetterRow: View {
     let letter: Letter
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
+        VStack(alignment: .leading, spacing: 8) {
             HStack(alignment: .lastTextBaseline) {
-                Text(letter.code)
-                    .font(.system(size: 14, weight: .semibold, design: .serif))
-                    .kerning(1.5)
+                Text(letter.recipientName ?? "だれかへ")
+                    .font(Mincho.font(14.5))
                     .foregroundStyle(Paper.ink)
-
-                if let recipient = letter.recipientName {
-                    Text(recipient)
-                        .font(Mincho.font(12.5))
-                        .foregroundStyle(Paper.inkSoft)
-                }
 
                 Spacer()
 
@@ -359,33 +332,54 @@ struct SentLetterRow: View {
             }
 
             if let receipt = letter.receipt {
-                HStack(spacing: 12) {
-                    Text("生きた手が \(receipt.heldText) 持っていました")
-                        .font(Mincho.font(12))
-                        .foregroundStyle(Paper.ink.opacity(0.8))
+                // ここがこのアプリの答え。流した身体から、読んだ身体へ
+                HStack(alignment: .center, spacing: 10) {
+                    pulseChip(letter.senderBpm, label: "流した")
+                    Text("→")
+                        .font(Mincho.font(13))
+                        .foregroundStyle(Paper.inkFaint)
+                    pulseChip(receipt.readerBpm, label: "読んだ")
+                }
 
-                    if receipt.releaseCount > 0 {
-                        Text("置かれた \(receipt.releaseCount)回")
-                            .font(Mincho.font(11))
-                            .foregroundStyle(Paper.inkFaint)
-                    }
+                Text("見知らぬ誰かが \(receipt.heldText) 持っていました")
+                    .font(Mincho.font(12))
+                    .foregroundStyle(Paper.ink.opacity(0.8))
 
-                    if !receipt.completed {
-                        Text("最後まで届いていません")
-                            .font(Mincho.font(11))
-                            .foregroundStyle(Paper.ribbon.opacity(0.8))
+                if receipt.releaseCount > 0 || !receipt.completed {
+                    HStack(spacing: 12) {
+                        if receipt.releaseCount > 0 {
+                            Text("置かれた \(receipt.releaseCount)回")
+                                .font(Mincho.font(11))
+                                .foregroundStyle(Paper.inkFaint)
+                        }
+                        if !receipt.completed {
+                            Text("最後まで届いていません")
+                                .font(Mincho.font(11))
+                                .foregroundStyle(Paper.ribbon.opacity(0.8))
+                        }
                     }
                 }
             } else if letter.claimedAt != nil {
-                Text("受け取られました")
+                Text("誰かが拾いました")
                     .font(Mincho.font(12))
                     .foregroundStyle(Paper.inkSoft)
             } else {
-                Text("まだ受け取られていません")
+                Text("まだ海を漂っています")
                     .font(Mincho.font(12))
                     .foregroundStyle(Paper.inkFaint)
             }
         }
-        .padding(.vertical, 13)
+        .padding(.vertical, 14)
+    }
+
+    private func pulseChip(_ bpm: Double?, label: String) -> some View {
+        VStack(spacing: 2) {
+            Text(bpm.map { "\(Int($0.rounded()))" } ?? "——")
+                .font(Mincho.font(19, bold: true))
+                .foregroundStyle(bpm == nil ? Paper.inkFaint : Paper.ribbon)
+            Text(label)
+                .font(Mincho.font(9.5))
+                .foregroundStyle(Paper.inkFaint)
+        }
     }
 }
