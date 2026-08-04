@@ -1,0 +1,12 @@
+// 署名の設定。
+//
+// Apple の Team ID は組織を特定できるのでリポジトリに置かない。
+// 実値は Signing.local.xcconfig(git 管理外)に書く。
+// Signing.local.example.xcconfig をコピーして使う。
+//
+// 未設定のままでもシミュレータ向けのビルドは通る。実機に入れるには Team ID が必要。
+
+DEVELOPMENT_TEAM =
+
+// 存在すれば読み込む(無くてもビルドは失敗しない)
+#include? "Signing.local.xcconfig"

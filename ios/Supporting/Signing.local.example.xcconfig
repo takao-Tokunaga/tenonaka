@@ -1,0 +1,12 @@
+// Signing.local.xcconfig としてコピーして、自分の Team ID を書く。
+// このファイル(.local.xcconfig)は git 管理外。
+//
+//   cp ios/Supporting/Signing.local.example.xcconfig \
+//      ios/Supporting/Signing.local.xcconfig
+//
+// Team ID は以下で確認できる。
+//   security find-certificate -c "Apple Development: <名前>" -p \
+//     | openssl x509 -noout -subject
+// 出力の OU= の値が Team ID。
+
+DEVELOPMENT_TEAM = XXXXXXXXXX

@@ -1,11 +1,12 @@
 {
+  "_comment": "App Runner のインスタンスロールに付ける権限。ACCOUNT と REGION は使う環境の値に置き換える(README の手順を参照)",
   "Version": "2012-10-17",
   "Statement": [
     {
       "Sid": "ReadTenonakaParameters",
       "Effect": "Allow",
       "Action": ["ssm:GetParameter", "ssm:GetParameters"],
-      "Resource": "arn:aws:ssm:ap-northeast-1:ACCOUNT_ID:parameter/tenonaka/*"
+      "Resource": "arn:aws:ssm:REGION:ACCOUNT:parameter/tenonaka/*"
     },
     {
       "Sid": "DecryptOnlyViaSsm",
@@ -13,7 +14,7 @@
       "Action": "kms:Decrypt",
       "Resource": "*",
       "Condition": {
-        "StringEquals": { "kms:ViaService": "ssm.ap-northeast-1.amazonaws.com" }
+        "StringEquals": { "kms:ViaService": "ssm.REGION.amazonaws.com" }
       }
     }
   ]

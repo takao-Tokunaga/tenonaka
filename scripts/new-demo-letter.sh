@@ -6,13 +6,17 @@
 #
 #   ./scripts/new-demo-letter.sh              符号は自動生成 (読める10文字)
 #   ./scripts/new-demo-letter.sh SAKURA       符号を指定 (5〜12文字の英字)
-#   BASE_URL=http://localhost:3100 ./scripts/new-demo-letter.sh
+#
+# 接続先は BASE_URL で指定する。既定はローカル。
+#   BASE_URL=https://xxxx.awsapprunner.com ./scripts/new-demo-letter.sh
+#
+# ~/.tenonaka-deploy.env に BASE_URL を書いておけば source して使える。
 #
 # 本文は scripts/demo-letter.txt を編集する。
 
 set -euo pipefail
 
-BASE_URL="${BASE_URL:-https://SERVICE_ID.ap-northeast-1.awsapprunner.com}"
+BASE_URL="${BASE_URL:-http://localhost:3100}"
 SENDER_ID="${SENDER_ID:-demo-sender}"
 SENDER_NAME="${SENDER_NAME:-母より}"
 RECIPIENT_NAME="${RECIPIENT_NAME:-あなたへ}"

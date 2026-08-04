@@ -15,6 +15,9 @@ DerivedData/
 *.xcuserstate
 xcuserdata/
 *.xcodeproj/project.xcworkspace/
+
+# 署名の実値(Apple の Team ID は組織を特定できるので追跡しない)
+Signing.local.xcconfig
 *.xcworkspace/xcuserdata/
 .swiftpm/
 

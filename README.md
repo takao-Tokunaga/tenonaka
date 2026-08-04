@@ -136,7 +136,14 @@ open ios/Tenonaka.xcodeproj
 
 ### 実機
 
-署名は自動署名で設定済み(`DEVELOPMENT_TEAM = XXXXXXXXXX`)。
+署名は自動署名。Apple の Team ID はリポジトリに含めていないので、初回だけ用意する。
+
+```bash
+cp ios/Supporting/Signing.local.example.xcconfig ios/Supporting/Signing.local.xcconfig
+# 自分の Team ID を書く。確認方法はファイル内のコメント参照
+```
+
+このファイルは git 管理外で、任意インクルードなので**無くてもシミュレータ向けビルドは通る**。
 
 iOS 16 以降は **デベロッパモード** が必要:
 設定 → プライバシーとセキュリティ → デベロッパモード → オン → 再起動。
@@ -146,11 +153,14 @@ iOS 16 以降は **デベロッパモード** が必要:
 cd ios
 xcodebuild -project Tenonaka.xcodeproj -scheme Tenonaka \
   -destination 'id=<DEVICE_UDID>' -configuration Debug \
-  TENONAKA_API_BASE_URL="https://SERVICE_ID.ap-northeast-1.awsapprunner.com" \
+  TENONAKA_API_BASE_URL="https://<your-service>.awsapprunner.com" \
   -allowProvisioningUpdates build
 
 xcrun devicectl device install app --device <DEVICE_ID> <APP_PATH>
 ```
+
+`xcrun devicectl list devices` で `<DEVICE_ID>` を、
+`xcrun xctrace list devices` で `<DEVICE_UDID>` を確認できる。
 
 接続先はビルド設定 `TENONAKA_API_BASE_URL` が既定値になる。
 **ホーム画面のタイトル「手のなか」を長押し**すると実行中に差し替えられる
@@ -160,7 +170,7 @@ xcrun devicectl device install app --device <DEVICE_ID> <APP_PATH>
 
 | | |
 |---|---|
-| API | `https://SERVICE_ID.ap-northeast-1.awsapprunner.com` |
+| API | App Runner が発行する `https://<id>.<region>.awsapprunner.com` |
 | 実行 | App Runner `tenonaka-api` (0.5 vCPU / 1GB) |
 | DB | RDS PostgreSQL 18.3 `tenonaka-db`(非公開・単一AZ) |
 | 経路 | App Runner → VPC コネクタ → RDS。SG 参照で 5432 のみ許可 |
@@ -198,7 +208,15 @@ SSM パラメータストアの SecureString に置き、`RuntimeEnvironmentSecr
 ECR プル用のロールとは別物である。
 
 権限は [`scripts/deploy/instance-role-policy.json`](scripts/deploy/instance-role-policy.json) の通り
-最小限に絞っている。
+最小限に絞っている。`ACCOUNT` と `REGION` は自分の値に置き換えて使う。
+
+```bash
+sed -e "s/ACCOUNT/${ACCOUNT}/g" -e "s/REGION/${AWS_REGION}/g" \
+  scripts/deploy/instance-role-policy.json > /tmp/instance-role-policy.json
+aws iam put-role-policy --role-name tenonaka-apprunner-instance-role \
+  --policy-name read-tenonaka-parameters \
+  --policy-document file:///tmp/instance-role-policy.json
+```
 
 - `ssm:GetParameter` は `/tenonaka/*` のみ(他プロジェクトのパラメータは読めない)
 - `kms:Decrypt` は `kms:ViaService = ssm.ap-northeast-1.amazonaws.com` の条件付き
