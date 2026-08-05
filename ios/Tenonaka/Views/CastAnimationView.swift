@@ -1,48 +1,5 @@
 import SwiftUI
 
-/// 瓶の輪郭。細い首と、なだらかな肩を持たせて硝子瓶に見せる。
-struct BottleShape: Shape {
-    func path(in rect: CGRect) -> Path {
-        func point(_ x: CGFloat, _ y: CGFloat) -> CGPoint {
-            CGPoint(x: rect.minX + rect.width * x, y: rect.minY + rect.height * y)
-        }
-
-        var path = Path()
-        // 口(わずかに張り出す)
-        path.move(to: point(0.393, 0.004))
-        path.addLine(to: point(0.607, 0.004))
-        path.addLine(to: point(0.607, 0.040))
-        path.addLine(to: point(0.580, 0.056))
-        // 首。細く長くする
-        path.addLine(to: point(0.580, 0.270))
-        // 肩(右)。二段の曲線でなだらかに落とす
-        path.addCurve(
-            to: point(0.795, 0.455),
-            control1: point(0.596, 0.355),
-            control2: point(0.795, 0.365)
-        )
-        // 胴(右)
-        path.addLine(to: point(0.795, 0.930))
-        path.addQuadCurve(to: point(0.695, 0.996), control: point(0.795, 0.982))
-        // 底
-        path.addLine(to: point(0.305, 0.996))
-        path.addQuadCurve(to: point(0.205, 0.930), control: point(0.205, 0.982))
-        // 胴(左)
-        path.addLine(to: point(0.205, 0.455))
-        // 肩(左)
-        path.addCurve(
-            to: point(0.420, 0.270),
-            control1: point(0.205, 0.365),
-            control2: point(0.404, 0.355)
-        )
-        // 首
-        path.addLine(to: point(0.420, 0.056))
-        path.addLine(to: point(0.393, 0.040))
-        path.closeSubpath()
-        return path
-    }
-}
-
 /// 波。位相を動かして流れをつくる。線は frame の中央、塗りはそこから下。
 struct WaveShape: Shape {
     var phase: CGFloat
@@ -72,7 +29,7 @@ struct WaveShape: Shape {
     }
 }
 
-/// 手紙を瓶に入れて海に流す演出。
+/// 便りを瓶に入れて海に流す演出。
 ///
 /// 巻く → 瓶が来る → 入れる → 栓をする → 水面に浮かぶ → 流れていく の順。
 /// 位置は画面の高さに対する割合で決めているので、水面と瓶がずれない。
@@ -81,13 +38,13 @@ struct CastAnimationView: View {
     let letter: Letter
     let onClose: () -> Void
 
-    @Environment(\.dismiss) private var dismiss
-
     /// 0:紙 1:巻く 2:瓶が来る 3:入れる 4:栓 5:水面に浮かぶ 6:流れていく 7:文字
     @State private var stage = 0
     @State private var wavePhase: CGFloat = 0
     @State private var bob = false
     @State private var didFinish = false
+    /// 一度流したら二度は流さない。画面が出し直されても最初から始めないため
+    @State private var didPlay = false
 
     private var isRolled: Bool { stage >= 1 }
     private var hasBottle: Bool { stage >= 2 }
@@ -132,10 +89,14 @@ struct CastAnimationView: View {
             .contentShape(Rectangle())
             .onTapGesture { skip() }
         }
-        .task { await play() }
+        .task {
+            guard !didPlay else { return }
+            didPlay = true
+            await play()
+        }
     }
 
-    // MARK: - 瓶と手紙
+    // MARK: - 瓶と便り
 
     private func bottleAssembly(side: CGFloat, height: CGFloat) -> some View {
         /// 瓶の上端からの割合を、中心基準のずれに直す
@@ -147,7 +108,7 @@ struct CastAnimationView: View {
                     .transition(.opacity)
             }
 
-            // 巻かれた手紙。瓶の上から胴の中へ落ちる
+            // 巻かれた便り。瓶の上から胴の中へ落ちる
             scroll(side: side)
                 .offset(y: isInside ? offsetY(0.66) : (hasBottle ? offsetY(-0.22) : 0))
 
@@ -184,7 +145,7 @@ struct CastAnimationView: View {
         }
     }
 
-    /// 巻かれた手紙。巻く前は罫線のある紙、巻いた後は筒。
+    /// 巻かれた便り。巻く前は罫線のある紙、巻いた後は筒。
     ///
     /// 角を丸めすぎるとカプセル薬に見えるので、筒の角は僅かだけ落とし、
     /// 巻きの縁と両端の口を線で描いて紙が巻かれていることを示す。
@@ -333,31 +294,40 @@ struct CastAnimationView: View {
 
     // MARK: - 進行
 
+    /// 待ちは `try?` で潰さない。
+    ///
+    /// 打ち切られた Task の中では待ちが即座に抜けるので、`try?` にすると
+    /// 残りの段が一気に流れ、完了の文字が一瞬だけ映って見える。
+    /// 打ち切られたらそこで止め、今の絵のまま残す。
     private func play() async {
         // 波は最初から動かしておく(満ちてくるのは後から)
         withAnimation(.linear(duration: 7).repeatForever(autoreverses: false)) {
             wavePhase = 3
         }
 
-        try? await Task.sleep(for: .milliseconds(550))
-        withAnimation(.easeInOut(duration: 0.7)) { stage = 1 }
-        try? await Task.sleep(for: .milliseconds(760))
-        withAnimation(.easeOut(duration: 0.5)) { stage = 2 }
-        try? await Task.sleep(for: .milliseconds(580))
-        withAnimation(.easeIn(duration: 0.7)) { stage = 3 }
-        try? await Task.sleep(for: .milliseconds(760))
-        withAnimation(.spring(response: 0.34, dampingFraction: 0.55)) { stage = 4 }
-        try? await Task.sleep(for: .milliseconds(560))
-        withAnimation(.easeInOut(duration: 1.1)) { stage = 5 }
-        try? await Task.sleep(for: .milliseconds(1150))
-        // 浮いてから揺れはじめる
-        withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
-            bob = true
+        do {
+            try await Task.sleep(for: .milliseconds(550))
+            withAnimation(.easeInOut(duration: 0.7)) { stage = 1 }
+            try await Task.sleep(for: .milliseconds(760))
+            withAnimation(.easeOut(duration: 0.5)) { stage = 2 }
+            try await Task.sleep(for: .milliseconds(580))
+            withAnimation(.easeIn(duration: 0.7)) { stage = 3 }
+            try await Task.sleep(for: .milliseconds(760))
+            withAnimation(.spring(response: 0.34, dampingFraction: 0.55)) { stage = 4 }
+            try await Task.sleep(for: .milliseconds(560))
+            withAnimation(.easeInOut(duration: 1.1)) { stage = 5 }
+            try await Task.sleep(for: .milliseconds(1150))
+            // 浮いてから揺れはじめる
+            withAnimation(.easeInOut(duration: 1.8).repeatForever(autoreverses: true)) {
+                bob = true
+            }
+            try await Task.sleep(for: .milliseconds(700))
+            withAnimation(.easeInOut(duration: 2.6)) { stage = 6 }
+            try await Task.sleep(for: .milliseconds(1700))
+            withAnimation(.easeIn(duration: 0.9)) { stage = 7 }
+        } catch {
+            return
         }
-        try? await Task.sleep(for: .milliseconds(700))
-        withAnimation(.easeInOut(duration: 2.6)) { stage = 6 }
-        try? await Task.sleep(for: .milliseconds(1700))
-        withAnimation(.easeIn(duration: 0.9)) { stage = 7 }
     }
 
     /// タップで飛ばす。演出は主役ではないので待たせない
@@ -366,10 +336,10 @@ struct CastAnimationView: View {
         withAnimation(.easeInOut(duration: 0.4)) { stage = 7 }
     }
 
+    /// 閉じ方は呼んだ側に任せる。この画面は自分がどう出されているかを知らない
     private func finish() {
         guard !didFinish else { return }
         didFinish = true
-        dismiss()
         onClose()
     }
 }
