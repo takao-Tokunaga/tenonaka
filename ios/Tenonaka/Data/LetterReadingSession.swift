@@ -1,7 +1,7 @@
 import Foundation
 import SwiftUI
 
-/// 手紙を読んでいる最中の状態。
+/// 便りを読んでいる最中の状態。
 ///
 /// 握られている間だけインクが現れる。置くと止まる。飛ばせない。
 /// まだ現れていない文字は描画もされないので、先を覗くことも、
@@ -26,8 +26,10 @@ final class LetterReadingSession: ObservableObject {
 
     /// 現れる速さ。日本語の黙読は毎秒8〜12文字あたり
     private let charactersPerSecond: Double = 10
-    /// 置かれてから案内を出すまでの間
-    private let pauseNoticeDelay: Double = 1.2
+    /// 置かれてから案内を出すまでの間。
+    /// 止まるのが早くなった(TremorSensor の猶予1秒)ので、
+    /// 止まったのに理由が出ない間が長く感じないよう短くしてある
+    private let pauseNoticeDelay: Double = 0.8
 
     private var progress: Double = 0
     private var ticker: Task<Void, Never>?

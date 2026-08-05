@@ -10,7 +10,7 @@ enum LetterError: LocalizedError {
 
     var errorDescription: String? {
         switch self {
-        case .notFound: return "その符号の手紙はありません"
+        case .notFound: return "その符号の便りはありません"
         case .rejected(let reason): return reason
         case .badResponse(let status): return "サーバーからの応答が不正です (\(status))"
         case .decoding: return "サーバーからの応答を解釈できませんでした"
@@ -35,7 +35,7 @@ private struct ServerErrorBody: Decodable {
     private enum CodingKeys: String, CodingKey { case message }
 }
 
-/// 手紙のやりとり。接続先は実行時に差し替えられるよう毎回 AppConfig から読む。
+/// 便りのやりとり。接続先は実行時に差し替えられるよう毎回 AppConfig から読む。
 struct LetterRepository {
     private var baseURL: URL { AppConfig.apiBaseURL }
     private var userId: String { AppConfig.userId }
@@ -46,6 +46,12 @@ struct LetterRepository {
         // 会場でサーバーが落ちていても UI が固まらないよう短めに切る
         configuration.timeoutIntervalForRequest = 5
         configuration.timeoutIntervalForResource = 8
+        // 一切キャッシュを見ない。
+        // 海の通数も拾える数も、古い値を見せた時点で意味を失う。
+        // サーバーが Cache-Control を送っていないので今のところ問題は出ないが、
+        // 暗黙の挙動に頼らず、必ず取りに行くことを明示しておく
+        configuration.requestCachePolicy = .reloadIgnoringLocalCacheData
+        configuration.urlCache = nil
         session = URLSession(configuration: configuration)
     }
 
@@ -79,7 +85,7 @@ struct LetterRepository {
         return SeaState(drifting: decoded.drifting, canPickUp: decoded.canPickUp)
     }
 
-    /// 拾った手紙を読み直す
+    /// 拾った便りを読み直す
     func fetch(code: String) async throws -> Letter {
         let data = try await send(path: "letters/\(code.uppercased())", method: "GET")
         return try decodeLetter(data)
@@ -93,7 +99,7 @@ struct LetterRepository {
         return dtos.map { $0.toDomain() }
     }
 
-    /// 受け取った手紙の控え。本文は含まれない
+    /// 受け取った便りの控え。本文は含まれない
     func listReceived() async throws -> [ReceivedLetter] {
         let data = try await send(path: "letters/received", method: "GET")
         guard let dtos = try? JSONDecoder().decode([ReceivedLetterDTO].self, from: data) else {
@@ -103,7 +109,7 @@ struct LetterRepository {
     }
 
     /// 読まれ方を流した人に返す。内容への返信は含まない。
-    /// 脈を添えると、手紙の効果が読んだ人の身体で測られたことになる。
+    /// 脈を添えると、便りの効果が読んだ人の身体で測られたことになる。
     func submitReceipt(code: String, receipt: ReadReceipt) async throws {
         var payload: [String: Any] = [
             "heldSeconds": receipt.heldSeconds,
@@ -167,7 +173,7 @@ struct LetterRepository {
 /// 日付は文字列で受けて自分で変換する。
 /// サーバーは小数秒つきの ISO8601 を返すが、JSONDecoder の .iso8601 は小数秒を扱えない。
 private struct LetterDTO: Decodable {
-    // 受け取った手紙の控えでも同じ形なので共有する
+    // 受け取った便りの控えでも同じ形なので共有する
     struct Receipt: Decodable {
         let heldSeconds: Double
         let releaseCount: Int
@@ -207,7 +213,7 @@ private struct LetterDTO: Decodable {
     }
 }
 
-/// 受け取った手紙の控え。本文が無いのが正しい形。
+/// 受け取った便りの控え。本文が無いのが正しい形。
 private struct ReceivedLetterDTO: Decodable {
     let code: String
     let senderName: String?

@@ -1,10 +1,10 @@
 import Foundation
 
-/// 海に流す手紙。
+/// 海に流す便り。
 /// 流すときに書いた人の脈が刻まれ、拾った誰かが読み終えたときの
 /// 脈と握っていた時間が返る。
 struct Letter: Identifiable, Hashable, Sendable {
-    /// 手紙の識別子。UI には出さないが、読み直しの取得に使う
+    /// 便りの識別子。UI には出さないが、読み直しの取得に使う
     var code: String
     var body: String
     /// 署名(差出人)
@@ -23,17 +23,11 @@ struct Letter: Identifiable, Hashable, Sendable {
 
     var characters: [Character] { Array(body) }
 
-    /// 手紙の日付。紙と明朝の世界に合わせて漢数字で組む
-    var dateText: String {
-        let parts = Calendar.current.dateComponents([.year, .month, .day], from: sentAt)
-        guard let year = parts.year, let month = parts.month, let day = parts.day else {
-            return ""
-        }
-        return "\(KanjiNumber.year(year))年\(KanjiNumber.of(month))月\(KanjiNumber.of(day))日"
-    }
+    /// 便りの日付
+    var dateText: String { JapaneseDate.text(sentAt) }
 }
 
-/// 受け取った手紙の控え。
+/// 受け取った便りの控え。
 ///
 /// **本文を持たない。** 読み直すときもサーバーから取り直して読む画面を通す。
 /// 手元に全文を置いてしまうと、握らないと読めないという機構が読み直しで崩れる。
@@ -50,14 +44,10 @@ struct ReceivedLetter: Identifiable, Hashable, Sendable {
 
     var id: String { code }
 
-    /// 拾った日。漢数字で組む
+    /// 拾った日
     var claimedDateText: String {
         guard let claimedAt else { return "" }
-        let parts = Calendar.current.dateComponents([.year, .month, .day], from: claimedAt)
-        guard let year = parts.year, let month = parts.month, let day = parts.day else {
-            return ""
-        }
-        return "\(KanjiNumber.year(year))年\(KanjiNumber.of(month))月\(KanjiNumber.of(day))日"
+        return JapaneseDate.text(claimedAt)
     }
 }
 
@@ -82,28 +72,17 @@ struct ReadReceipt: Hashable, Sendable {
     }
 }
 
-/// 漢数字。日付を「二〇二六年八月四日」と組むためだけの最小実装。
-enum KanjiNumber {
-    private static let digits = ["〇", "一", "二", "三", "四", "五", "六", "七", "八", "九"]
-
-    /// 年は桁ごとに並べる(二〇二六)
-    static func year(_ value: Int) -> String {
-        String(value).compactMap { character in
-            character.wholeNumberValue.map { digits[$0] }
-        }.joined()
-    }
-
-    /// 月日は数として読む(十四、二十四)
-    static func of(_ value: Int) -> String {
-        switch value {
-        case 0..<10: return digits[value]
-        case 10: return "十"
-        case 11..<20: return "十" + digits[value - 10]
-        default:
-            let tens = value / 10
-            let ones = value % 10
-            return digits[tens] + "十" + (ones == 0 ? "" : digits[ones])
+/// 日付の組み。「2026年8月5日」と読める形にする。
+///
+/// 以前は紙と明朝に合わせて漢数字で組んでいたが、日付は雰囲気より
+/// 読み取りやすさが要る。数字のほうが一目で分かる。
+enum JapaneseDate {
+    static func text(_ date: Date) -> String {
+        let parts = Calendar.current.dateComponents([.year, .month, .day], from: date)
+        guard let year = parts.year, let month = parts.month, let day = parts.day else {
+            return ""
         }
+        return "\(year)年\(month)月\(day)日"
     }
 }
 
