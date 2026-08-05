@@ -3,7 +3,7 @@ import SwiftUI
 
 /// 海の様子。
 struct SeaState: Hashable, Sendable {
-    /// いま漂っていて拾える手紙の数(自分が流したものは含まない)
+    /// いま漂っていて拾える便りの数(自分が流したものは含まない)
     var drifting: Int
     /// あと何通拾えるか。流した数から拾った数を引いたもの
     var canPickUp: Int
@@ -11,12 +11,12 @@ struct SeaState: Hashable, Sendable {
     static let unknown = SeaState(drifting: 0, canPickUp: 0)
 }
 
-/// 画面から見た手紙の入り口。
+/// 画面から見た便りの入り口。
 @MainActor
 final class LetterStore: ObservableObject {
-    /// 自分が流した手紙。返ってきた身体の記録がここに載る
+    /// 自分が流した便り。返ってきた身体の記録がここに載る
     @Published private(set) var sent: [Letter] = []
-    /// 自分が拾った手紙の控え。本文は持たない
+    /// 自分が拾った便りの控え。本文は持たない
     @Published private(set) var received: [ReceivedLetter] = []
     @Published private(set) var sea: SeaState = .unknown
     @Published private(set) var isOffline = false
@@ -74,7 +74,7 @@ final class LetterStore: ObservableObject {
         return letter
     }
 
-    /// 拾った手紙を読み直す。本文を手元に置かず、毎回取り直させる
+    /// 拾った便りを読み直す。本文を手元に置かず、毎回取り直させる
     func fetch(code: String) async throws -> Letter {
         let letter = try await repository.fetch(code: code)
         isOffline = false

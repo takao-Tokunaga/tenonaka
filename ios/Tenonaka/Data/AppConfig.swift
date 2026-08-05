@@ -55,7 +55,7 @@ enum AppConfig {
     /// 認証は簡易実装。x-user-id ヘッダとして送る ID。
     ///
     /// 端末ごとに一度だけ発行して保存する。公開したサーバーでは固定値にすると
-    /// 全員の「送った手紙」が混ざってしまうため。
+    /// 全員の「送った便り」が混ざってしまうため。
     static var userId: String {
         let key = "userId"
         if let existing = UserDefaults.standard.string(forKey: key) { return existing }
