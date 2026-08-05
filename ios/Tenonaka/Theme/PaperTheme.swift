@@ -26,20 +26,30 @@ enum Paper {
 }
 
 /// 明朝体。日本語の記録アプリなので、本文はゴシックではなく明朝で組む。
+///
+/// 大きさは各画面で基準の値を渡し、ここで一律に倍率をかける。
+/// 画面ごとに数字を書き換えると、少し直すたびに全画面を見て回ることになる。
 enum Mincho {
-    static func font(_ size: CGFloat, bold: Bool = false) -> Font {
+    /// 字の大きさの倍率。
+    /// 明朝は同じ pt でもゴシックより小さく見えるので、一段上げてある
+    static let scale: CGFloat = 1.15
+
+    /// 実際に組まれる大きさ。端数は丸めて、罫線の計算とずれないようにする
+    static func size(_ base: CGFloat) -> CGFloat { (base * scale).rounded() }
+
+    static func font(_ base: CGFloat, bold: Bool = false) -> Font {
         let name = bold ? "HiraMinProN-W6" : "HiraMinProN-W3"
-        if let uiFont = UIFont(name: name, size: size) {
+        if let uiFont = UIFont(name: name, size: size(base)) {
             return Font(uiFont)
         }
         // 明朝が取れない環境ではセリフ体にフォールバック
-        return .system(size: size, weight: bold ? .semibold : .regular, design: .serif)
+        return .system(size: size(base), weight: bold ? .semibold : .regular, design: .serif)
     }
 
-    static func uiFont(_ size: CGFloat, bold: Bool = false) -> UIFont {
+    static func uiFont(_ base: CGFloat, bold: Bool = false) -> UIFont {
         let name = bold ? "HiraMinProN-W6" : "HiraMinProN-W3"
-        return UIFont(name: name, size: size)
-            ?? UIFont.systemFont(ofSize: size, weight: bold ? .semibold : .regular)
+        return UIFont(name: name, size: size(base))
+            ?? UIFont.systemFont(ofSize: size(base), weight: bold ? .semibold : .regular)
     }
 }
 
@@ -48,28 +58,51 @@ enum Mincho {
 /// 罫線と文字を同じ律で並べるため、行送りをここ一箇所で決める。
 /// 背景に固定間隔の罫線を敷くと文字と噛み合わず、線が字に重なってしまう。
 enum BodyText {
+    /// 基準の大きさ。組み上がりは Mincho が倍率をかける
     static let size: CGFloat = 17
 
-    /// 行送り。罫線の間隔もこれ。ここを起点にして行間を逆算する
-    static let pitch: CGFloat = 40
+    /// 組み上がりの字の大きさ
+    static var rendered: CGFloat { Mincho.size(size) }
 
     /**
-     UIKit が実際に組む一行の高さ。
+     行送り。罫線の間隔もこれ。
 
-     `UIFont.lineHeight` も `NSString.size` も、明朝では 1em(17pt)を返す。
-     しかし実際に組み上がった行を画面から測ると 25.3pt だった
-     (行送り 40.3pt = 25.3 + 行間 15)。この差の分だけ罫線がずれていた。
-
-     API から取れないので実測した比を使う。フォントを変えたら測り直すこと。
+     字の大きさに対する比で決める。17pt のときに 40pt で釣り合っていたので、
+     その比を保つ。字を大きくしたときに罫線だけ据え置かれると詰まって見える。
      */
-    private static let layoutLineHeightRatio: CGFloat = 25.3 / 17
-    static var layoutLineHeight: CGFloat { size * layoutLineHeightRatio }
+    static var pitch: CGFloat { (rendered * 40 / 17).rounded() }
 
-    /// Text / TextEditor に渡す行間。行送りから組み上がりの行高を引いたもの
-    static var spacing: CGFloat { pitch - layoutLineHeight }
+    /// 字そのものの高さ。カーソルの丈もこれに合わせる
+    static var glyphHeight: CGFloat {
+        let font = Mincho.uiFont(size)
+        return font.ascender - font.descender
+    }
 
-    /// 行の上端からベースラインまで。罫線を引く基準はここ
-    static var ascender: CGFloat { Mincho.uiFont(size).ascender }
+    /**
+     カーソルを持ち上げる量。
+
+     UITextView が返すカーソルの枠は行送りの余白まで含んでいるので、
+     そのまま使うと字より下へ伸びる(実測で11pt下がっていた)。
+     字の下端に合う量を画面で測り、字の大きさに対する比で持つ。
+     */
+    static var caretLift: CGFloat { (rendered * 0.5).rounded() }
+
+    /**
+     組み上がりの一行の高さは、描く仕組みによって違う。画面を測って確かめた値。
+
+     - SwiftUI の `Text`  : 1em(17pt)
+     - `UITextView`       : 約1.49em(25.3pt)
+
+     どちらも行の高さは指定できず行間しか渡せないので、行送りを共通にして
+     行間を種類ごとに逆算する。同じ行間を渡すと片方だけずれる。
+     */
+    static var textLineHeight: CGFloat { rendered }
+    static var editorLineHeight: CGFloat { rendered * 1.488 }
+
+    /// 読む画面(SwiftUI Text)に渡す行間
+    static var textSpacing: CGFloat { pitch - textLineHeight }
+    /// 書く欄(UITextView)に渡す行間
+    static var editorSpacing: CGFloat { pitch - editorLineHeight }
 
     static var font: Font { Mincho.font(size) }
 }
@@ -78,13 +111,14 @@ enum BodyText {
 ///
 /// 本文と同じ器の中に敷くので、器の原点が共通になり位置がずれない。
 struct BodyRules: View {
-    /// ベースラインから線までの間。0 だと字の下端に触れて「被って」見えるので、
-    /// かなの下に伸びる部分をよけられるだけ空ける
-    private let clearance: CGFloat = 4
+    /**
+     一行目の線の位置。
 
-    /// 最初の線をどこに引くか。
-    /// 一行目のベースラインは行の上端から ascender の位置にあるので、そこを基準にする
-    private var firstLine: CGFloat { BodyText.ascender + clearance }
+     字は行の器の上寄りに乗るので、行送りから素直に引くと線が下がりすぎる。
+     画面を測ると、行送りのちょうど半分が字の下端の少し下に当たった。
+     書く欄と読む欄で同じ値になったので、画面ごとの調整は持たせない。
+     */
+    var firstLine: CGFloat = BodyText.pitch / 2
 
     var body: some View {
         GeometryReader { geometry in

@@ -1,6 +1,6 @@
 import SwiftUI
 
-/// 手紙を読む画面。
+/// 便りを読む画面。
 /// 握られている間だけ文字が現れ、置くと止まる。
 /// 長さを見せないので、あと何行あるか推し量ることもできない。
 struct LetterReadingView: View {
@@ -33,7 +33,7 @@ struct LetterReadingView: View {
 
                         Text(session.revealedText)
                             .font(BodyText.font)
-                            .lineSpacing(BodyText.spacing)
+                            .lineSpacing(BodyText.textSpacing)
                             .foregroundStyle(Paper.ink)
                             // 文字が現れる前も便箋に見えるよう、罫線の下限を確保する
                             .frame(
@@ -42,7 +42,11 @@ struct LetterReadingView: View {
                                 alignment: .topLeading
                             )
                             // 罫線は本文の後ろに、同じ行送りで敷く
-                            .background(alignment: .topLeading) { BodyRules() }
+                            .background(alignment: .topLeading) {
+                                // Text は行の上端が原点。字はその中で上寄りに乗るので、
+                                // 書く欄より線を上げる
+                                BodyRules()
+                            }
 
                         if endingStage >= 1 {
                             closing
@@ -118,7 +122,7 @@ struct LetterReadingView: View {
 
                 if let bpm = session.letter.senderBpm {
                     // 流した人が封をしたときの脈。生きた身体が流した証
-                    Text("脈 \(Int(bpm.rounded())) で封をされた手紙")
+                    Text("脈 \(Int(bpm.rounded())) で封をされた便り")
                         .font(Mincho.font(11))
                         .foregroundStyle(Paper.inkFaint)
                 }
@@ -150,7 +154,7 @@ struct LetterReadingView: View {
                 Text(
                     session.revealedCount == 0
                         ? "机に置くと止まります"
-                        : "この手紙は、要約できません"
+                        : "この便りは、要約できません"
                 )
                 .font(Mincho.font(11))
                 .foregroundStyle(Paper.inkFaint)
@@ -174,7 +178,7 @@ struct LetterReadingView: View {
 
     // MARK: - 後付け(日付・署名・宛名)
 
-    /// 日本語の手紙の作法どおり、日付と署名を右に寄せ、宛名を左に置く。
+    /// 日本語の便りの作法どおり、日付と署名を右に寄せ、宛名を左に置く。
     private var closing: some View {
         VStack(alignment: .leading, spacing: 26) {
             VStack(alignment: .trailing, spacing: 12) {
@@ -213,7 +217,7 @@ struct LetterReadingView: View {
                 .fill(Paper.rule.opacity(0.6))
                 .frame(height: 0.6)
 
-            Text("あなたはこの手紙を \(session.receipt(readerBpm: nil).heldText) 持っていました。")
+            Text("あなたはこの便りを \(session.receipt(readerBpm: nil).heldText) 持っていました。")
                 .font(Mincho.font(13.5))
                 .foregroundStyle(Paper.inkSoft)
 
