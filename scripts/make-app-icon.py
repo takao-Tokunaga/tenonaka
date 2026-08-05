@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """アプリアイコンを生成する。
 
-紙の地に朱色の手を置き、その手のひらの中に脈の線を通す。
-アプリの名前(手のなか)と機構(生きた手・脈)をそのまま絵にしたもの。
+紙の地に、栓のされた瓶を一本立て、その中に巻かれた手紙を沈める。
+宛先の無いまま流された手紙、というこのアプリの姿をそのまま絵にしたもの。
 
-脈は鋭い一拍だけに絞っている。T波まで入れると手のひらの中で潰れて読めない。
+瓶の輪郭はアプリ内(Views/Bottle.swift の BottleShape)と同じ比率で描く。
+アイコンと画面の中の瓶が違う形だと、同じ海の話に見えない。
+
+巻かれた紙には朱の印を一つだけ置く。脈で封をするという機構の印で、
+アプリ内の朱印(SealSheet)と同じ役目を持たせている。
 
   python3 scripts/make-app-icon.py
 
@@ -25,13 +29,21 @@ OUT = (
     / "ios/Tenonaka/Assets.xcassets/AppIcon.appiconset/AppIcon.png"
 )
 
-# アプリ内の配色と揃える (Theme/PaperTheme.swift)
+# アプリ内の配色と揃える (Theme/PaperTheme.swift, Views/Bottle.swift)
 PAPER = (243, 236, 221)
 PAPER_DARK = (237, 229, 212)
 SHADE = (200, 186, 163)
-INK = (43, 37, 32)
 SEAL = (140, 55, 52)
-SEAL_DEEP = (117, 43, 41)
+GLASS = (146, 175, 169)
+GLASS_DEEP = (118, 150, 145)
+GLASS_LINE = (86, 112, 109)
+CORK = (189, 150, 102)
+CORK_DEEP = (145, 110, 70)
+
+# 瓶の置き方。まっすぐ立てると標本のようになるので少し傾ける
+TILT_DEGREES = 9.0
+# 瓶の丈(アイコンの一辺に対する割合)。輪郭の比は 1 : 1.78
+BOTTLE_HEIGHT = 0.74
 
 
 def paper_ground(image: Image.Image) -> None:
@@ -61,36 +73,6 @@ def paper_grain(image: Image.Image) -> None:
     )
 
 
-def pulse_path(cx: float, cy: float, half_width: float, scale: float):
-    """脈波の形。
-    立ち上がりの鋭さが心拍らしさを決めるので、頂点を明示した折れ線で作る。
-    手のひらに収めるので、余分な波は入れず一拍だけにする。
-    """
-    corners = [
-        (0.00, 0.00),
-        (0.34, 0.00),
-        (0.40, -0.18),  # 立ち上がる前の小さな落ち込み
-        (0.50, 1.00),  # 鋭い頂点
-        (0.60, -0.34),  # 深い谷
-        (0.67, 0.00),
-        (1.00, 0.00),
-    ]
-
-    def to_xy(t: float, h: float) -> tuple[float, float]:
-        return (cx - half_width + half_width * 2 * t, cy - h * scale)
-
-    points: list[tuple[float, float]] = []
-    for index in range(len(corners) - 1):
-        t0, h0 = corners[index]
-        t1, h1 = corners[index + 1]
-        steps = 40
-        for step in range(steps):
-            k = step / steps
-            points.append(to_xy(t0 + (t1 - t0) * k, h0 + (h1 - h0) * k))
-    points.append(to_xy(*corners[-1]))
-    return points
-
-
 def stroke(
     draw: ImageDraw.ImageDraw, points, width: float, color, smooth: bool = False
 ) -> None:
@@ -117,111 +99,232 @@ def stroke(
         previous = current
 
 
-def hand_mask(scale: float) -> Image.Image:
-    """手のひらを正面から見た形。
-    実物に似せるより、小さいサイズで手だと分かる輪郭を優先している。
-    指と親指は太い線(丸端)として引き、手のひらと合成する。
-    """
-    canvas = round(SIZE * scale)
-    mask = Image.new("L", (canvas, canvas), 0)
-    draw = ImageDraw.Draw(mask)
+# MARK: - 曲線
 
-    def px(value: float) -> float:
-        return value * canvas
 
-    # 手のひら
-    draw.rounded_rectangle(
-        [px(0.275), px(0.455), px(0.725), px(0.830)],
-        radius=px(0.105),
-        fill=255,
+def cubic(p0, p1, p2, p3, steps: int = 56):
+    """三次ベジェを折れ線に落とす。PIL は曲線を引けないので自分で刻む"""
+    points = []
+    for index in range(steps + 1):
+        t = index / steps
+        u = 1 - t
+        points.append(
+            (
+                u**3 * p0[0] + 3 * u * u * t * p1[0] + 3 * u * t * t * p2[0] + t**3 * p3[0],
+                u**3 * p0[1] + 3 * u * u * t * p1[1] + 3 * u * t * t * p2[1] + t**3 * p3[1],
+            )
+        )
+    return points
+
+
+def quad(p0, p1, p2, steps: int = 36):
+    """二次ベジェを折れ線に落とす"""
+    points = []
+    for index in range(steps + 1):
+        t = index / steps
+        u = 1 - t
+        points.append(
+            (
+                u * u * p0[0] + 2 * u * t * p1[0] + t * t * p2[0],
+                u * u * p0[1] + 2 * u * t * p1[1] + t * t * p2[1],
+            )
+        )
+    return points
+
+
+def bottle_outline(width: float, height: float, origin=(0.0, 0.0)):
+    """瓶の輪郭。Views/Bottle.swift の BottleShape と同じ比率"""
+
+    def point(fx: float, fy: float):
+        return (origin[0] + width * fx, origin[1] + height * fy)
+
+    points = [point(0.393, 0.004), point(0.607, 0.004), point(0.607, 0.040)]
+    points.append(point(0.580, 0.056))
+    # 首
+    points.append(point(0.580, 0.270))
+    # 肩(右)
+    points += cubic(
+        point(0.580, 0.270), point(0.596, 0.355), point(0.795, 0.365), point(0.795, 0.455)
+    )
+    # 胴(右)
+    points.append(point(0.795, 0.930))
+    points += quad(point(0.795, 0.930), point(0.795, 0.982), point(0.695, 0.996))
+    # 底
+    points.append(point(0.305, 0.996))
+    points += quad(point(0.305, 0.996), point(0.205, 0.982), point(0.205, 0.930))
+    # 胴(左)
+    points.append(point(0.205, 0.455))
+    # 肩(左)
+    points += cubic(
+        point(0.205, 0.455), point(0.205, 0.365), point(0.404, 0.355), point(0.420, 0.270)
+    )
+    # 首
+    points.append(point(0.420, 0.056))
+    points.append(point(0.393, 0.040))
+    return points
+
+
+# MARK: - 中身
+
+
+def rotated_layer(size, radius: float, fill, angle: float):
+    """角丸の板を描いて回す。巻いた紙と栓に使う"""
+    layer = Image.new("RGBA", (round(size[0]), round(size[1])), (0, 0, 0, 0))
+    ImageDraw.Draw(layer).rounded_rectangle(
+        [0, 0, layer.width - 1, layer.height - 1], radius=radius, fill=fill
+    )
+    return layer.rotate(angle, resample=Image.BICUBIC, expand=True)
+
+
+def paste_centered(base: Image.Image, layer: Image.Image, center) -> None:
+    base.alpha_composite(
+        layer,
+        (round(center[0] - layer.width / 2), round(center[1] - layer.height / 2)),
     )
 
-    # 指4本。長さを少しずつ変えて手に見せる。
-    # まっすぐなので角丸矩形で描く(円を並べると輪郭に段が出る)
-    finger_half = px(0.049)
-    finger_bottom = px(0.620)
-    for center, top in (
-        (0.329, 0.290),  # 人差し指
-        (0.443, 0.243),  # 中指
-        (0.557, 0.272),  # 薬指
-        (0.671, 0.352),  # 小指
-    ):
-        draw.rounded_rectangle(
-            [px(center) - finger_half, px(top), px(center) + finger_half, finger_bottom],
-            radius=finger_half,
-            fill=255,
-        )
 
-    # 親指。手のひらの左下から斜めに出すので、こちらは線で引く
+def draw_scroll(bottle: Image.Image, width: float, height: float) -> None:
+    """巻かれた便り。胴の中に斜めに沈める。
+
+    太く短いと札に見えるので、筒として細長く取り、両端に口を描いて
+    紙が巻かれていることを示す。中ほどを朱の紐で結ぶ。
+    紐は「封」の印で、アプリ内の朱印と同じ役目を持たせている。
+    """
+    thickness = width * 0.22
+    length = width * 0.78
+    angle = 22.0
+
+    # まっすぐな向きで組み立ててから、まとめて一度だけ回す。
+    # 部品ごとに回すと継ぎ目がずれる
+    roll = Image.new("RGBA", (round(thickness), round(length)), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(roll)
+    draw.rounded_rectangle(
+        [0, 0, roll.width - 1, roll.height - 1],
+        radius=thickness * 0.16,
+        fill=PAPER + (255,),
+    )
+
+    # 筒の両端。中が空いている口
+    cap_height = thickness * 0.34
+    inset = thickness * 0.07
+    draw.ellipse(
+        [inset, -cap_height / 2, roll.width - inset, cap_height / 2],
+        fill=SHADE + (215,),
+    )
+    draw.ellipse(
+        [inset, roll.height - cap_height / 2, roll.width - inset, roll.height + cap_height / 2],
+        fill=SHADE + (170,),
+    )
+
+    # 巻き終わりの縁。紙が重なっている線
+    seam_x = roll.width * 0.68
+    draw.line(
+        [(seam_x, cap_height * 0.6), (seam_x, roll.height - cap_height * 0.6)],
+        fill=SHADE + (190,),
+        width=max(round(thickness * 0.05), 2),
+    )
+
+    # 朱の紐。巻いた紙を結んでいる
+    tie_height = length * 0.085
+    tie_top = (roll.height - tie_height) / 2
+    draw.rectangle(
+        [-thickness * 0.04, tie_top, roll.width + thickness * 0.04, tie_top + tie_height],
+        fill=SEAL + (255,),
+    )
+
+    paste_centered(
+        bottle,
+        roll.rotate(angle, resample=Image.BICUBIC, expand=True),
+        (width * 0.500, height * 0.715),
+    )
+
+
+def draw_cork(bottle: Image.Image, width: float, height: float) -> None:
+    """栓。首の口に差し込む"""
+    layer = Image.new("RGBA", (round(width), round(height * 0.12)), (0, 0, 0, 0))
+    draw = ImageDraw.Draw(layer)
+    cork_width = width * 0.185
+    cork_height = height * 0.052
+    left = (layer.width - cork_width) / 2
+    for y in range(round(cork_height)):
+        t = y / max(cork_height - 1, 1)
+        color = tuple(round(CORK[i] + (CORK_DEEP[i] - CORK[i]) * t) for i in range(3))
+        draw.line([(left, y), (left + cork_width, y)], fill=color + (255,))
+    # 角を落とす
+    rounded = Image.new("L", layer.size, 0)
+    ImageDraw.Draw(rounded).rounded_rectangle(
+        [left, 0, left + cork_width, cork_height],
+        radius=cork_width * 0.16,
+        fill=255,
+    )
+    layer.putalpha(rounded)
+    bottle.alpha_composite(layer, (0, round(height * 0.012)))
+
+
+def draw_bottle(image: Image.Image) -> None:
+    """瓶を一本立て、栓をして、中に手紙を沈める"""
+    # 拡大して描いてから縮小し、輪郭を滑らかにする
+    factor = 4
+    canvas = SIZE * factor
+    height = canvas * BOTTLE_HEIGHT
+    width = height / 1.78
+
+    bottle = Image.new("RGBA", (round(width), round(height)), (0, 0, 0, 0))
+    outline = bottle_outline(width, height)
+
+    # 硝子。上を明るく下を沈めて厚みを出す
+    glass = Image.new("RGBA", bottle.size, (0, 0, 0, 0))
+    gradient = ImageDraw.Draw(glass)
+    for y in range(round(height)):
+        t = y / height
+        color = tuple(round(GLASS[i] + (GLASS_DEEP[i] - GLASS[i]) * t) for i in range(3))
+        gradient.line([(0, y), (width, y)], fill=color + (232,))
+    shape = Image.new("L", bottle.size, 0)
+    ImageDraw.Draw(shape).polygon(outline, fill=255)
+    glass.putalpha(shape.point(lambda v: v * 232 // 255))
+    bottle.alpha_composite(glass)
+
+    draw_scroll(bottle, width, height)
+    draw_cork(bottle, width, height)
+
+    # 硝子の照り。中身の上に置いて「ガラス越し」に見せる
+    shine = rotated_layer(
+        (width * 0.035, height * 0.20), radius=width * 0.02,
+        fill=(255, 255, 255, 96), angle=0.0
+    )
+    paste_centered(bottle, shine, (width * 0.315, height * 0.600))
+
+    # 輪郭。中身を描いた後に引いて、瓶が手前にあることを示す
     stroke(
-        draw,
-        [(px(0.325), px(0.735)), (px(0.185), px(0.560))],
-        px(0.108),
-        255,
+        ImageDraw.Draw(bottle),
+        outline + [outline[0]],
+        width * 0.020,
+        GLASS_LINE + (215,),
         smooth=True,
     )
 
-    return mask
-
-
-# 手を傾ける角度。正面を向いていると「止まれ」の記号に見えるので少し崩す
-TILT_DEGREES = 14.0
-# 傾けると重心が動くので、画面の中央に戻す量(canvas 比)
-TILT_OFFSET = (0.028, -0.030)
-
-
-def draw_hand(image: Image.Image) -> None:
-    """朱色の手を置き、手のひらの中に脈を抜く"""
-    # 拡大して描いてから縮小し、輪郭を滑らかにする
-    factor = 4
-    mask = hand_mask(factor)
-    canvas = mask.size[0]
-
-    hand = Image.new("RGBA", (canvas, canvas), (0, 0, 0, 0))
-    hand.paste(Image.new("RGB", (canvas, canvas), SEAL), (0, 0), mask)
-    hand.putalpha(mask)
-
-    # 脈の線。手のひらの中に紙の色で抜く
-    draw = ImageDraw.Draw(hand)
-    palm_cx = canvas * 0.500
-    palm_cy = canvas * 0.722
-    points = pulse_path(palm_cx, palm_cy, canvas * 0.152, canvas * 0.082)
-    stroke(draw, points, canvas * 0.032, PAPER + (255,), smooth=True)
-
-    # 脈ごと傾ける。手のひらの中の線も一緒に回るので、関係が崩れない。
-    # 回すと重心がずれて角に寄るので、同時に平行移動で戻す
-    shift = (canvas * TILT_OFFSET[0], canvas * TILT_OFFSET[1])
-    hand = hand.rotate(
-        TILT_DEGREES,
-        resample=Image.BICUBIC,
-        center=(palm_cx, palm_cy),
-        translate=shift,
+    bottle = bottle.rotate(-TILT_DEGREES, resample=Image.BICUBIC, expand=True)
+    scaled = bottle.resize(
+        (round(bottle.width / factor), round(bottle.height / factor)), Image.LANCZOS
     )
-    mask = mask.rotate(
-        TILT_DEGREES,
-        resample=Image.BICUBIC,
-        center=(palm_cx, palm_cy),
-        translate=shift,
-    )
-
-    small = hand.resize((SIZE, SIZE), Image.LANCZOS)
 
     # 紙に落ちる影
-    shadow_mask = mask.resize((SIZE, SIZE), Image.LANCZOS)
-    shadow = Image.new("RGBA", (SIZE, SIZE), (0, 0, 0, 0))
-    shadow.paste(Image.new("RGB", (SIZE, SIZE), SHADE), (0, 0), shadow_mask)
-    shadow.putalpha(shadow_mask.point(lambda v: v * 100 // 255))
-    shadow = shadow.filter(ImageFilter.GaussianBlur(SIZE * 0.016))
+    shadow = Image.new("RGBA", scaled.size, (0, 0, 0, 0))
+    shadow.paste(Image.new("RGB", scaled.size, SHADE), (0, 0), scaled.getchannel("A"))
+    shadow.putalpha(scaled.getchannel("A").point(lambda v: v * 95 // 255))
+    shadow = shadow.filter(ImageFilter.GaussianBlur(SIZE * 0.014))
 
-    image.paste(shadow, (0, round(SIZE * 0.012)), shadow)
-    image.paste(small, (0, 0), small)
+    left = round((SIZE - scaled.width) / 2)
+    top = round((SIZE - scaled.height) / 2)
+    image.paste(shadow, (left, top + round(SIZE * 0.013)), shadow)
+    image.paste(scaled, (left, top), scaled)
 
 
 def main() -> None:
     image = Image.new("RGB", (SIZE, SIZE), PAPER)
     paper_ground(image)
     paper_grain(image)
-    draw_hand(image)
+    draw_bottle(image)
 
     OUT.parent.mkdir(parents=True, exist_ok=True)
     # iOS のアイコンは透過も角丸も持たせない(システムが丸める)

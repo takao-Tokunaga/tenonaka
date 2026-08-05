@@ -67,7 +67,7 @@ final class PulseSensor: NSObject, ObservableObject {
 
     private let session = AVCaptureSession()
     private let output = AVCaptureVideoDataOutput()
-    private let queue = DispatchQueue(label: "dev.takao.tenonaka.pulse")
+    private let queue = DispatchQueue(label: "dev.takao.namibin.pulse")
     private var device: AVCaptureDevice?
 
     /// 生の観測値(時刻と赤成分の平均)

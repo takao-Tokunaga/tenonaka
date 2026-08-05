@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>ja</string>
 	<key>CFBundleDisplayName</key>
-	<string>手のなか</string>
+	<string>波びん</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -39,7 +39,11 @@
 	<key>NSCameraUsageDescription</key>
 	<string>指を当てて脈を測るためにカメラを使います。映像はどこにも保存・送信されません。</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>同じネットワーク上にある記録用のサーバーと、日記としおりを同期します。</string>
+	<string>開発中に、同じネットワーク上にある手元のサーバーへ便りを預けるために使います。</string>
+	<!-- 通信は HTTPS だけで、独自の暗号は持たない(輸出規制の対象外)。
+	     入れておかないと配布のたびに手で申告することになる -->
+	<key>ITSAppUsesNonExemptEncryption</key>
+	<false/>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
