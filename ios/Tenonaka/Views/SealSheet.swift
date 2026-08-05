@@ -2,8 +2,8 @@ import SwiftUI
 
 /// 脈で封をする画面。
 ///
-/// ここがこのアプリの関門。脈が取れないと手紙は送れない。
-/// 生きた身体がこの瞬間にここに居たことが、封として手紙に刻まれる。
+/// ここがこのアプリの関門。脈が取れないと便りは送れない。
+/// 生きた身体がこの瞬間にここに居たことが、封として便りに刻まれる。
 struct SealSheet: View {
     let onSealed: (Double) -> Void
 
@@ -42,9 +42,21 @@ struct SealSheet: View {
             }
             .padding(.horizontal, 30)
         }
-        .onAppear { sensor.start() }
+        // 検証時はカメラを触らない(許可を求める窓が演出に被る)
+        .onAppear { if !DebugFlags.autoCast { sensor.start() } }
         .onDisappear { sensor.stop() }
         .task {
+            // 検証時はカメラを使わず、そのまま送るところまで進める
+            if DebugFlags.autoCast {
+                try? await Task.sleep(for: .milliseconds(400))
+                withAnimation(.easeOut(duration: 0.4)) { sealedBpm = 72 }
+                sensor.stop()
+                try? await Task.sleep(for: .milliseconds(600))
+                onSealed(72)
+                dismiss()
+                return
+            }
+
             // 良い状態が続いた時間を数える。ぶれたら振り出しに戻す
             let step = 0.25
             while sealedBpm == nil && !Task.isCancelled {

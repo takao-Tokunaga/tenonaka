@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- TestFlight / App Store へ上げるときの書き出し設定。
+     scripts/release-ios.sh から使う。
+     teamID は書かない(公開しているため)。自動署名なので、Xcode に入っている
+     アカウントから解決される -->
+<plist version="1.0">
+<dict>
+	<key>method</key>
+	<string>app-store-connect</string>
+	<!-- 署名は Xcode に任せる。配布用の証明書と Profile が無ければ作らせる -->
+	<key>signingStyle</key>
+	<string>automatic</string>
+	<!-- ビットコードは廃止済み。付けると弾かれる -->
+	<key>uploadSymbols</key>
+	<true/>
+</dict>
+</plist>
